@@ -1,0 +1,81 @@
+{
+  "name": "vscode-api-viewer",
+  "displayName": "vscode-api-viewer",
+  "description": "An VSCode extension for view api docs from Yapi or swagger, and inssert code snippet",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.45.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:vscode-api-viewer.viewApiList"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "api-viewer-explorer",
+          "title": "Api Viewer Explorer",
+          "icon": "resources/todo-tree-container.svg"
+        }
+      ]
+    },
+    "views": {
+      "api-viewer-explorer": [
+        {
+          "id": "api-list-viewer",
+          "name": "Api List"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vscode-api-viewer.viewApiList",
+        "title": "View Api List"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Api Viewer",
+      "properties": {
+        "api-viewer.yapi.email": {
+          "default": "",
+          "type": "string",
+          "markdownDescription": ""
+        },
+        "api-viewer.yapi.password": {
+          "default": "",
+          "type": "string",
+          "markdownDescription": ""
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint src --ext ts",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.45.0",
+    "@types/glob": "^7.1.1",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^13.11.0",
+    "eslint": "^6.8.0",
+    "@typescript-eslint/parser": "^2.30.0",
+    "@typescript-eslint/eslint-plugin": "^2.30.0",
+    "glob": "^7.1.6",
+    "mocha": "^7.1.2",
+    "typescript": "^3.8.3",
+    "vscode-test": "^1.3.0"
+  },
+  "dependencies": {
+    "got": "^11.3.0"
+  }
+}
