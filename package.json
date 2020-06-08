@@ -50,6 +50,11 @@
           "command": "vscode-api-viewer.insertTypeCode",
           "when": "viewItem == ApiNode",
           "group": "inline@1"
+        },
+        {
+          "command": "vscode-api-viewer.openInBrowser",
+          "when": "viewItem == ApiNode",
+          "group": "inline@2"
         }
       ]
     },
@@ -66,6 +71,15 @@
       {
         "command": "vscode-api-viewer.insertTypeCode",
         "title": "Insert Types Code",
+        "category": "Api Viewer",
+        "icon": {
+          "dark": "resources/refresh.svg",
+          "light": "resources/refresh.svg"
+        }
+      },
+      {
+        "command": "vscode-api-viewer.openInBrowser",
+        "title": "Open in browser",
         "category": "Api Viewer",
         "icon": {
           "dark": "resources/refresh.svg",

@@ -84,6 +84,26 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  let openInBrowserCommand = vscode.commands.registerCommand(
+    'vscode-api-viewer.openInBrowser',
+    (node) => {
+      if (node.type === 'api') {
+        const props = node.props as ApiNode['props'];
+        let url = _.trim(
+          vscode.workspace.getConfiguration('api-viewer.yapi').url
+        );
+        url = url.match(/\/$/) ? url : url + '/';
+        const pid = _.trim(
+          vscode.workspace.getConfiguration('api-viewer.yapi').pid
+        );
+
+        vscode.env.openExternal(
+          vscode.Uri.parse(`${url}project/${pid}/interface/api/${props._id}`)
+        );
+      }
+    }
+  );
+
   context.subscriptions.push(updateCommand, insertTypeCodeCommand);
 }
 
