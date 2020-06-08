@@ -1,64 +1,65 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
-import got from 'got';
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+import * as vscode from "vscode";
+import got from "got";
+import * as _ from "lodash";
 
 let apiGroups: APIGroup[] = [];
 
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
   console.log(
     'Congratulations, your extension "vscode-api-viewer" is now active!'
   );
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with registerCommand
-  // The commandId parameter must match the command field in package.json
   let disposable = vscode.commands.registerCommand(
-    'vscode-api-viewer.viewApiList',
+    "vscode-api-viewer.update",
     () => {
-      // The code you place here will be executed every time your command is executed
-      // fetch('https://petstore.swagger.io/v2/swagger.json').then((ret: any) => {
-      //   console.log(ret);
-      // });
       (async () => {
-        const email = vscode.workspace.getConfiguration(
-          'api-viewer.yapi'
-        ).email;
-        const password = vscode.workspace.getConfiguration(
-          'api-viewer.yapi'
-        ).password;
-        const response = await got('http://127.0.0.1:3000/api/user/login', {
-          method: 'POST',
+        const email = vscode.workspace.getConfiguration("api-viewer.yapi")
+          .email;
+        const password = vscode.workspace.getConfiguration("api-viewer.yapi")
+          .password;
+        let url = _.trim(
+          vscode.workspace.getConfiguration("api-viewer.yapi").url
+        );
+        url = url.match(/\/$/) ? url : url + "/";
+        const pid = _.trim(
+          vscode.workspace.getConfiguration("api-viewer.yapi").pid
+        );
+        const response = await got(`${url}api/user/login`, {
+          method: "POST",
           json: { email, password },
         });
-        console.log(response);
-        const cookies = response.headers['set-cookie']?.map((cookie) => {
-          return cookie.split(';')[0];
+
+        const cookies = response.headers["set-cookie"]?.map((cookie) => {
+          return cookie.split(";")[0];
         });
 
         const apiResponse = await got(
-          'http://127.0.0.1:3000/api/plugin/export?type=json&pid=11&status=all&isWiki=false',
+          `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
           {
             headers: {
-              cookie: cookies?.join(';'),
+              cookie: cookies?.join(";"),
             },
           }
         );
 
         apiGroups = JSON.parse(apiResponse.body) as any[];
 
-        vscode.window.createTreeView('api-list-viewer', {
-          treeDataProvider: new TreeNodeProvider(apiGroups),
+        const apiViewListTree = vscode.window.createTreeView(
+          "api-viewer-list",
+          {
+            treeDataProvider: new TreeNodeProvider(apiGroups),
+          }
+        );
+
+        apiViewListTree.onDidChangeSelection((e) => {
+          console.log(e);
         });
       })();
-      // Display a message box to the user
-      vscode.window.showInformationMessage(
-        'Hello World from vscode-api-viewer!'
-      );
+
+      // vscode.window.showInformationMessage(
+      //   "Hello World from vscode-api-viewer!"
+      // );
     }
   );
 
@@ -77,8 +78,11 @@ export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
 
   getChildren(element?: TreeNode): TreeNode[] {
     if (element) {
-      if (element.type === 'group') {
+      if (element.type === "group") {
         return getApiList((element as GroupNode).list);
+      }
+      if (element.type === 'api') {
+        return getApiProps((element as ApiNode).props);
       }
     } else {
       return getGroups();
@@ -121,7 +125,14 @@ function getApiList(list: API[]) {
   return treeNodes;
 }
 
-function getApiDetails(details: API) {}
+function getApiProps(props: API) {
+  const treeNodes: ApiPropsNode[] =[];
+  const method = new ApiPropsNode(`Method: ${props.method}`, '', vscode.TreeItemCollapsibleState.None);
+  const path = new ApiPropsNode(`Path: ${props.path}`, '', vscode.TreeItemCollapsibleState.None);
+
+  treeNodes.push(method, path);
+  return treeNodes;
+}
 
 export abstract class TreeNode extends vscode.TreeItem {
   constructor(
@@ -149,7 +160,7 @@ export class GroupNode extends TreeNode {
     public list: API[],
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, 'group', collapsibleState);
+    super(label, desc, "group", collapsibleState);
   }
 
   get tooltip() {
@@ -165,11 +176,11 @@ export class ApiNode extends TreeNode {
   constructor(
     public label: string,
     desc: string,
-    public detail: API,
+    public props: API,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, 'api', collapsibleState);
-    this.label = `${detail.method}:${detail.path}`;
+    super(label, desc, "api", collapsibleState);
+    this.label = `${props.method} ${props.path}`;
   }
 
   get tooltip() {
@@ -177,17 +188,17 @@ export class ApiNode extends TreeNode {
   }
 
   get description(): string {
-    return this.desc;
+    return this.props.title;
   }
 }
 
-export class ApiDetailNode extends TreeNode {
+export class ApiPropsNode extends TreeNode {
   constructor(
     public label: string,
     desc: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, 'api', collapsibleState);
+    super(label, desc, "apiProps", collapsibleState);
   }
 
   get tooltip() {
@@ -240,10 +251,10 @@ export interface API {
 }
 
 export enum Method {
-  Delete = 'DELETE',
-  Get = 'GET',
-  Post = 'POST',
-  Put = 'PUT',
+  Delete = "DELETE",
+  Get = "GET",
+  Post = "POST",
+  Put = "PUT",
 }
 
 export interface QueryPath {
@@ -260,9 +271,9 @@ export interface ReqBodyForm {
 }
 
 export enum BodyType {
-  Form = 'form',
-  JSON = 'json',
-  Raw = 'raw',
+  Form = "form",
+  JSON = "json",
+  Raw = "raw",
 }
 
 export interface ReqHeader {
@@ -273,8 +284,8 @@ export interface ReqHeader {
 }
 
 export enum ReqHeaderName {
-  APIKey = 'api_key',
-  ContentType = 'Content-Type',
+  APIKey = "api_key",
+  ContentType = "Content-Type",
 }
 
 export interface Req {
@@ -285,16 +296,16 @@ export interface Req {
 }
 
 export enum Status {
-  Undone = 'undone',
+  Undone = "undone",
 }
 
 export enum NameElement {
-  Pet = 'pet',
-  Store = 'store',
-  User = 'user',
+  Pet = "pet",
+  Store = "store",
+  User = "user",
 }
 
 export enum Type {
-  Static = 'static',
-  Var = 'var',
+  Static = "static",
+  Var = "var",
 }
