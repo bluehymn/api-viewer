@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import got from 'got';
 import * as _ from 'lodash';
 import { compile as schemaToTypescript } from 'json-schema-to-typescript';
+import * as dayjs from 'dayjs';
 
 let apiGroups: APIGroup[] = [];
 
@@ -52,10 +53,6 @@ export function activate(context: vscode.ExtensionContext) {
             treeDataProvider: new TreeNodeProvider(apiGroups),
           }
         );
-
-        apiViewListTree.onDidChangeSelection((e) => {
-          console.log(e);
-        });
       })();
 
       // vscode.window.showInformationMessage(
@@ -71,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
         const props = node.props as ApiNode['props'];
         try {
           schemaToTypescript(JSON.parse(props.res_body), 'type').then((out) => {
-            console.log(out);
+            // console.log(out);
             const activeTextEditor = vscode.window.activeTextEditor;
             if (activeTextEditor) {
               const snippetString = new vscode.SnippetString();
@@ -183,8 +180,14 @@ function getApiProps(props: API) {
     '',
     vscode.TreeItemCollapsibleState.None
   );
+  const time = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  const updateTime = new ApiPropsNode(
+    `UpdateAt: ${time}`,
+    '',
+    vscode.TreeItemCollapsibleState.None
+  );
 
-  treeNodes.push(method, path, desc);
+  treeNodes.push(method, path, desc, updateTime);
   return treeNodes;
 }
 
