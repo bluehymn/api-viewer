@@ -1,8 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
-import got from "got";
-import * as _ from "lodash";
+import * as vscode from 'vscode';
+import got from 'got';
+import * as _ from 'lodash';
+import { compile as schemaToTypescript } from 'json-schema-to-typescript';
 
 let apiGroups: APIGroup[] = [];
 
@@ -11,34 +12,34 @@ export function activate(context: vscode.ExtensionContext) {
     'Congratulations, your extension "vscode-api-viewer" is now active!'
   );
   let updateCommand = vscode.commands.registerCommand(
-    "vscode-api-viewer.update",
+    'vscode-api-viewer.update',
     () => {
       (async () => {
-        const email = vscode.workspace.getConfiguration("api-viewer.yapi")
+        const email = vscode.workspace.getConfiguration('api-viewer.yapi')
           .email;
-        const password = vscode.workspace.getConfiguration("api-viewer.yapi")
+        const password = vscode.workspace.getConfiguration('api-viewer.yapi')
           .password;
         let url = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").url
+          vscode.workspace.getConfiguration('api-viewer.yapi').url
         );
-        url = url.match(/\/$/) ? url : url + "/";
+        url = url.match(/\/$/) ? url : url + '/';
         const pid = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").pid
+          vscode.workspace.getConfiguration('api-viewer.yapi').pid
         );
         const response = await got(`${url}api/user/login`, {
-          method: "POST",
+          method: 'POST',
           json: { email, password },
         });
 
-        const cookies = response.headers["set-cookie"]?.map((cookie) => {
-          return cookie.split(";")[0];
+        const cookies = response.headers['set-cookie']?.map((cookie) => {
+          return cookie.split(';')[0];
         });
 
         const apiResponse = await got(
           `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
           {
             headers: {
-              cookie: cookies?.join(";"),
+              cookie: cookies?.join(';'),
             },
           }
         );
@@ -46,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
         apiGroups = JSON.parse(apiResponse.body) as any[];
 
         const apiViewListTree = vscode.window.createTreeView(
-          "api-viewer-list",
+          'api-viewer-list',
           {
             treeDataProvider: new TreeNodeProvider(apiGroups),
           }
@@ -64,10 +65,21 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   let insertTypeCodeCommand = vscode.commands.registerCommand(
-    "vscode-api-viewer.insertTypeCode",
+    'vscode-api-viewer.insertTypeCode',
     (node) => {
-      if (node.type === "api") {
-        console.log(node);
+      if (node.type === 'api') {
+        const props = node.props as ApiNode['props'];
+        try {
+          schemaToTypescript(JSON.parse(props.res_body), 'type').then((out) => {
+            console.log(out);
+            const activeTextEditor = vscode.window.activeTextEditor;
+            if (activeTextEditor) {
+              const snippetString = new vscode.SnippetString();
+              snippetString.appendText(out);
+              activeTextEditor.insertSnippet(snippetString);
+            }
+          });
+        } catch (e) {}
       }
     }
   );
@@ -87,10 +99,10 @@ export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
 
   getChildren(element?: TreeNode): TreeNode[] {
     if (element) {
-      if (element.type === "group") {
+      if (element.type === 'group') {
         return getApiList((element as GroupNode).list);
       }
-      if (element.type === "api") {
+      if (element.type === 'api') {
         return getApiProps((element as ApiNode).props);
       }
     } else {
@@ -138,17 +150,17 @@ function getApiProps(props: API) {
   const treeNodes: ApiPropsNode[] = [];
   const method = new ApiPropsNode(
     `Method: ${props.method}`,
-    "",
+    '',
     vscode.TreeItemCollapsibleState.None
   );
   const path = new ApiPropsNode(
     `Path: ${props.path}`,
-    "",
+    '',
     vscode.TreeItemCollapsibleState.None
   );
   const desc = new ApiPropsNode(
     `Desc: ${props.desc}`,
-    "",
+    '',
     vscode.TreeItemCollapsibleState.None
   );
 
@@ -182,7 +194,7 @@ export class GroupNode extends TreeNode {
     public list: API[],
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, "group", collapsibleState);
+    super(label, desc, 'group', collapsibleState);
   }
 
   get tooltip() {
@@ -201,9 +213,9 @@ export class ApiNode extends TreeNode {
     public props: API,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, "api", collapsibleState);
+    super(label, desc, 'api', collapsibleState);
     this.label = `${props.method} ${props.path}`;
-    this.contextValue = "ApiNode";
+    this.contextValue = 'ApiNode';
   }
 
   get tooltip() {
@@ -221,7 +233,7 @@ export class ApiPropsNode extends TreeNode {
     desc: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState
   ) {
-    super(label, desc, "apiProps", collapsibleState);
+    super(label, desc, 'apiProps', collapsibleState);
   }
 
   get tooltip() {
@@ -274,10 +286,10 @@ export interface API {
 }
 
 export enum Method {
-  Delete = "DELETE",
-  Get = "GET",
-  Post = "POST",
-  Put = "PUT",
+  Delete = 'DELETE',
+  Get = 'GET',
+  Post = 'POST',
+  Put = 'PUT',
 }
 
 export interface QueryPath {
@@ -294,9 +306,9 @@ export interface ReqBodyForm {
 }
 
 export enum BodyType {
-  Form = "form",
-  JSON = "json",
-  Raw = "raw",
+  Form = 'form',
+  JSON = 'json',
+  Raw = 'raw',
 }
 
 export interface ReqHeader {
@@ -307,8 +319,8 @@ export interface ReqHeader {
 }
 
 export enum ReqHeaderName {
-  APIKey = "api_key",
-  ContentType = "Content-Type",
+  APIKey = 'api_key',
+  ContentType = 'Content-Type',
 }
 
 export interface Req {
@@ -319,16 +331,16 @@ export interface Req {
 }
 
 export enum Status {
-  Undone = "undone",
+  Undone = 'undone',
 }
 
 export enum NameElement {
-  Pet = "pet",
-  Store = "store",
-  User = "user",
+  Pet = 'pet',
+  Store = 'store',
+  User = 'user',
 }
 
 export enum Type {
-  Static = "static",
-  Var = "var",
+  Static = 'static',
+  Var = 'var',
 }

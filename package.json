@@ -34,8 +34,8 @@
     "menus": {
       "commandPalette": [
         {
-            "command": "vscode-api-viewer.insertTypeCode",
-            "when": "true"
+          "command": "vscode-api-viewer.insertTypeCode",
+          "when": "true"
         }
       ],
       "view/title": [
@@ -123,8 +123,11 @@
   },
   "dependencies": {
     "@types/lodash": "^4.14.155",
+    "@types/prettier": "^2.0.1",
     "dayjs": "^1.8.28",
     "got": "^11.3.0",
-    "lodash": "^4.17.15"
+    "json-schema-to-typescript": "^9.1.0",
+    "lodash": "^4.17.15",
+    "prettier": "^2.0.5"
   }
 }
