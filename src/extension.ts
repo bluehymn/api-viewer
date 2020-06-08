@@ -146,8 +146,13 @@ function getApiProps(props: API) {
     "",
     vscode.TreeItemCollapsibleState.None
   );
+  const desc = new ApiPropsNode(
+    `Desc: ${props.desc}`,
+    "",
+    vscode.TreeItemCollapsibleState.None
+  );
 
-  treeNodes.push(method, path);
+  treeNodes.push(method, path, desc);
   return treeNodes;
 }
 
