@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log(
     'Congratulations, your extension "vscode-api-viewer" is now active!'
   );
-  let disposable = vscode.commands.registerCommand(
+  let updateCommand = vscode.commands.registerCommand(
     "vscode-api-viewer.update",
     () => {
       (async () => {
@@ -63,7 +63,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(disposable);
+  let insertTypeCodeCommand = vscode.commands.registerCommand(
+    "vscode-api-viewer.insertTypeCode",
+    (node) => {
+      if (node.type === "api") {
+        console.log(node);
+      }
+    }
+  );
+
+  context.subscriptions.push(updateCommand, insertTypeCodeCommand);
 }
 
 // this method is called when your extension is deactivated
@@ -81,7 +90,7 @@ export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
       if (element.type === "group") {
         return getApiList((element as GroupNode).list);
       }
-      if (element.type === 'api') {
+      if (element.type === "api") {
         return getApiProps((element as ApiNode).props);
       }
     } else {
@@ -126,9 +135,17 @@ function getApiList(list: API[]) {
 }
 
 function getApiProps(props: API) {
-  const treeNodes: ApiPropsNode[] =[];
-  const method = new ApiPropsNode(`Method: ${props.method}`, '', vscode.TreeItemCollapsibleState.None);
-  const path = new ApiPropsNode(`Path: ${props.path}`, '', vscode.TreeItemCollapsibleState.None);
+  const treeNodes: ApiPropsNode[] = [];
+  const method = new ApiPropsNode(
+    `Method: ${props.method}`,
+    "",
+    vscode.TreeItemCollapsibleState.None
+  );
+  const path = new ApiPropsNode(
+    `Path: ${props.path}`,
+    "",
+    vscode.TreeItemCollapsibleState.None
+  );
 
   treeNodes.push(method, path);
   return treeNodes;
@@ -181,6 +198,7 @@ export class ApiNode extends TreeNode {
   ) {
     super(label, desc, "api", collapsibleState);
     this.label = `${props.method} ${props.path}`;
+    this.contextValue = "ApiNode";
   }
 
   get tooltip() {

@@ -32,22 +32,40 @@
       ]
     },
     "menus": {
+      "commandPalette": [
+        {
+            "command": "vscode-api-viewer.insertTypeCode",
+            "when": "true"
+        }
+      ],
       "view/title": [
         {
           "command": "vscode-api-viewer.update",
           "when": "view =~ /api-viewer/",
           "group": "navigation@1"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "vscode-api-viewer.insertTypeCode",
+          "when": "viewItem == ApiNode",
+          "group": "inline@1"
+        }
       ]
     },
     "commands": [
       {
-        "command": "vscode-api-viewer.viewApiList",
-        "title": "View Api List"
-      },
-      {
         "command": "vscode-api-viewer.update",
         "title": "Update Api List",
+        "category": "Api Viewer",
+        "icon": {
+          "dark": "resources/refresh.svg",
+          "light": "resources/refresh.svg"
+        }
+      },
+      {
+        "command": "vscode-api-viewer.insertTypeCode",
+        "title": "Insert Types Code",
         "category": "Api Viewer",
         "icon": {
           "dark": "resources/refresh.svg",
