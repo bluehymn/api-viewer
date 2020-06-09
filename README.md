@@ -1,4 +1,4 @@
-# Vscode API Viewer
+# VSCode API Viewer
 An VSCode extension for view api docs from Yapi or swagger, and inssert code snippet
 
 ## Configuration

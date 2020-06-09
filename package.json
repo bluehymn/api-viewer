@@ -2,7 +2,9 @@
   "name": "vscode-api-viewer",
   "displayName": "vscode-api-viewer",
   "description": "An VSCode extension for view api docs from Yapi or swagger, and inssert code snippet",
-  "version": "0.0.1",
+  "publisher": "bluehymn",
+  "repository": "https://github.com/bluehymn/api-viewer",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.45.0"
   },
@@ -12,7 +14,7 @@
   "activationEvents": [
     "*"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "icon": "resources/icon.png",
   "contributes": {
     "viewsContainers": {
@@ -116,25 +118,32 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "webpack --mode production",
+    "webpack": "webpack --mode development",
+    "webpack-dev": "webpack --mode development --watch",
+    "test-compile": "tsc -p ./",
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "^1.45.0",
     "@types/glob": "^7.1.1",
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.11.0",
-    "eslint": "^6.8.0",
-    "@typescript-eslint/parser": "^2.30.0",
+    "@types/vscode": "^1.45.0",
     "@typescript-eslint/eslint-plugin": "^2.30.0",
+    "@typescript-eslint/parser": "^2.30.0",
+    "eslint": "^6.8.0",
     "glob": "^7.1.6",
     "mocha": "^7.1.2",
+    "ts-loader": "^7.0.5",
     "typescript": "^3.8.3",
-    "vscode-test": "^1.3.0"
+    "vscode-test": "^1.3.0",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11"
   },
   "dependencies": {
     "@types/lodash": "^4.14.155",
