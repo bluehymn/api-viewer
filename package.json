@@ -13,13 +13,14 @@
     "*"
   ],
   "main": "./out/extension.js",
+  "icon": "resources/icon.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "api-viewer-explorer",
           "title": "Api Viewer Explorer",
-          "icon": "resources/tags.svg"
+          "icon": "resources/sidebar-icon.svg"
         }
       ]
     },
@@ -27,7 +28,7 @@
       "api-viewer-explorer": [
         {
           "id": "api-viewer-list",
-          "name": "Api List"
+          "name": ""
         }
       ]
     },
@@ -61,11 +62,11 @@
     "commands": [
       {
         "command": "vscode-api-viewer.update",
-        "title": "Update Api List",
+        "title": "Sync From Yapi",
         "category": "Api Viewer",
         "icon": {
-          "dark": "resources/refresh.svg",
-          "light": "resources/refresh.svg"
+          "dark": "resources/synchronize.svg",
+          "light": "resources/synchronize.svg"
         }
       },
       {
@@ -73,8 +74,8 @@
         "title": "Insert Types Code",
         "category": "Api Viewer",
         "icon": {
-          "dark": "resources/refresh.svg",
-          "light": "resources/refresh.svg"
+          "dark": "resources/typescript.svg",
+          "light": "resources/typescript.svg"
         }
       },
       {
@@ -82,8 +83,8 @@
         "title": "Open in browser",
         "category": "Api Viewer",
         "icon": {
-          "dark": "resources/refresh.svg",
-          "light": "resources/refresh.svg"
+          "dark": "resources/links.svg",
+          "light": "resources/links.svg"
         }
       }
     ],
