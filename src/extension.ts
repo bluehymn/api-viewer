@@ -10,8 +10,10 @@ import * as dayjs from "dayjs";
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
 let provider: vscode.TreeDataProvider<TreeNode>;
+let onDiskPath: string;
 
 export function activate(context: vscode.ExtensionContext) {
+  onDiskPath = context.extensionPath;
   console.log(
     'Congratulations, your extension "vscode-api-viewer" is now active!'
   );
@@ -191,7 +193,7 @@ function getApiProps(props: API) {
     vscode.TreeItemCollapsibleState.None
   );
   const desc = new ApiPropsNode(
-    `Desc: ${props.desc}`,
+    `Desc1: ${props.desc}`,
     "",
     vscode.TreeItemCollapsibleState.None
   );
@@ -227,8 +229,8 @@ export abstract class TreeNode extends vscode.TreeItem {
 
 export class GroupNode extends TreeNode {
   iconPath = {
-    light: path.join(__dirname, "..", "resources", "folder.svg"),
-    dark: path.join(__dirname, "..", "resources", "folder.svg"),
+    light: path.join(__filename, "..", "..", "resources", "folder.svg"),
+    dark: path.join(__filename, "..", "..", "resources", "folder.svg"),
   };
 
   constructor(
@@ -251,10 +253,10 @@ export class GroupNode extends TreeNode {
 
 export class ApiNode extends TreeNode {
   iconPath = {
-    light: path.join(__dirname, "..", "resources", "api.svg"),
-    dark: path.join(__dirname, "..", "resources", "api.svg"),
+    light: path.join(__filename, "..", "..", "resources", "api.svg"),
+    dark: path.join(__filename, "..", "..", "resources", "api.svg"),
   };
-
+ 
   constructor(
     public label: string,
     desc: string,
