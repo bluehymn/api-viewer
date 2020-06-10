@@ -21,57 +21,7 @@ export function activate(context: vscode.ExtensionContext) {
     "vscode-api-viewer.update",
     () => {
       (async () => {
-        if (apiViewListTree) {
-          apiViewListTree.message = "";
-        }
-
-        apiGroups = [];
-
-        const email = vscode.workspace.getConfiguration("api-viewer.yapi")
-          .email;
-        const password = vscode.workspace.getConfiguration("api-viewer.yapi")
-          .password;
-        let url = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").url
-        );
-        url = url.match(/\/$/) ? url : url + "/";
-        const pid = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").pid
-        );
-
-        vscode.window.showInformationMessage("APIViewer: Syncing data from Yapi");
-
-        const response = await got(`${url}api/user/login`, {
-          method: "POST",
-          json: { email, password },
-        });
-
-        const responseJson = JSON.parse(response.body);
-        if (responseJson.errcode === 405) {
-          vscode.window.showInformationMessage("APIViewer: Incorrect account or password");
-        }
-
-        const cookies = response.headers["set-cookie"]?.map((cookie) => {
-          return cookie.split(";")[0];
-        });
-
-        const apiResponse = await got(
-          `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
-          {
-            headers: {
-              cookie: cookies?.join(";"),
-            },
-          }
-        );
-
-        apiGroups = JSON.parse(apiResponse.body) as any[];
-
-        if (!apiViewListTree) {
-          provider = new TreeNodeProvider(apiGroups);
-          apiViewListTree = vscode.window.createTreeView("api-viewer-list", {
-            treeDataProvider: provider,
-          });
-        }
+        await update();
       })();
     }
   );
@@ -85,6 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
           schemaToTypescript(JSON.parse(props.res_body), "type").then(
             (out: string) => {
               // console.log(out);
+              out = out.replace(/\s*\[k: string\]:\sunknown;/g, "");
               const activeTextEditor = vscode.window.activeTextEditor;
               if (activeTextEditor) {
                 const snippetString = new vscode.SnippetString();
@@ -119,10 +70,70 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(updateCommand, insertTypeCodeCommand);
+
+  update();
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
+
+async function update() {
+  if (apiViewListTree) {
+    apiViewListTree.message = "";
+  }
+
+  apiGroups = [];
+
+  const email = vscode.workspace.getConfiguration("api-viewer.yapi").email;
+  const password = vscode.workspace.getConfiguration("api-viewer.yapi")
+    .password;
+  let url = _.trim(vscode.workspace.getConfiguration("api-viewer.yapi").url);
+  url = url.match(/\/$/) ? url : url + "/";
+  const pid = _.trim(vscode.workspace.getConfiguration("api-viewer.yapi").pid);
+
+  if (!(email && password && url && pid)) {
+    vscode.window.showInformationMessage(
+      "APIViewer: Missing some configurations!"
+    );
+    return;
+  }
+
+  vscode.window.showInformationMessage("APIViewer: Syncing data from Yapi");
+
+  const response = await got(`${url}api/user/login`, {
+    method: "POST",
+    json: { email, password },
+  });
+
+  const responseJson = JSON.parse(response.body);
+  if (responseJson.errcode === 405) {
+    vscode.window.showInformationMessage(
+      "APIViewer: Incorrect account or password"
+    );
+  }
+
+  const cookies = response.headers["set-cookie"]?.map((cookie) => {
+    return cookie.split(";")[0];
+  });
+
+  const apiResponse = await got(
+    `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
+    {
+      headers: {
+        cookie: cookies?.join(";"),
+      },
+    }
+  );
+
+  apiGroups = JSON.parse(apiResponse.body) as any[];
+
+  if (!apiViewListTree) {
+    provider = new TreeNodeProvider(apiGroups);
+    apiViewListTree = vscode.window.createTreeView("api-viewer-list", {
+      treeDataProvider: provider,
+    });
+  }
+}
 
 export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
   constructor(private groups: any[]) {}
@@ -256,7 +267,7 @@ export class ApiNode extends TreeNode {
     light: path.join(__filename, "..", "..", "resources", "api.svg"),
     dark: path.join(__filename, "..", "..", "resources", "api.svg"),
   };
- 
+
   constructor(
     public label: string,
     desc: string,
