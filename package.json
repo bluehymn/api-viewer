@@ -51,12 +51,12 @@
       "view/item/context": [
         {
           "command": "vscode-api-viewer.insertTypeCode",
-          "when": "viewItem == ApiNode",
+          "when": "viewItem == APINode",
           "group": "inline@1"
         },
         {
           "command": "vscode-api-viewer.openInBrowser",
-          "when": "viewItem == ApiNode",
+          "when": "viewItem == APINode",
           "group": "inline@2"
         }
       ]

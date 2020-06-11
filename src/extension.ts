@@ -1,11 +1,13 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
-import * as path from "path";
-import got from "got";
-import * as _ from "lodash";
-import { compile as schemaToTypescript } from "json-schema-to-typescript";
-import * as dayjs from "dayjs";
+import * as vscode from 'vscode';
+import * as path from 'path';
+import got from 'got';
+import * as _ from 'lodash';
+import { compile as schemaToTypescript } from 'json-schema-to-typescript';
+import * as dayjs from 'dayjs';
+import { API, APIGroup } from './types';
+import { SimpleAstParser } from './ast-parser';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -15,58 +17,56 @@ let onDiskPath: string;
 export function activate(context: vscode.ExtensionContext) {
   onDiskPath = context.extensionPath;
   console.log(
-    'Congratulations, your extension "vscode-api-viewer" is now active!'
+    'Congratulations, your extension "vscode-api-viewer" is now active!',
   );
   let updateCommand = vscode.commands.registerCommand(
-    "vscode-api-viewer.update",
+    'vscode-api-viewer.update',
     () => {
       (async () => {
         await update();
       })();
-    }
+    },
   );
 
   let insertTypeCodeCommand = vscode.commands.registerCommand(
-    "vscode-api-viewer.insertTypeCode",
-    (node) => {
-      if (node.type === "api") {
-        const props = node.props as ApiNode["props"];
-        try {
-          schemaToTypescript(JSON.parse(props.res_body), "type").then(
-            (out: string) => {
-              // console.log(out);
-              out = out.replace(/\s*\[k: string\]:\sunknown;/g, "");
-              const activeTextEditor = vscode.window.activeTextEditor;
-              if (activeTextEditor) {
-                const snippetString = new vscode.SnippetString();
-                snippetString.appendText(out);
-                activeTextEditor.insertSnippet(snippetString);
-              }
-            }
-          );
-        } catch (e) {}
+    'vscode-api-viewer.insertTypeCode',
+    async (node) => {
+      if (node.type === 'api') {
+        const props = node.props as APINode['props'];
+        const resTypeName = 'ResponseDataType';
+        const requestMethodName = 'requestMethod';
+        const activeTextEditor = vscode.window.activeTextEditor;
+        const parser = new SimpleAstParser();
+        if (activeTextEditor) {
+          const isTypescript =
+            activeTextEditor.document.languageId === 'typescript';
+          if (isTypescript) {
+            await insertTypes(activeTextEditor, parser, props, resTypeName);
+            await insertMethod(activeTextEditor, parser, props, resTypeName, requestMethodName);
+          }
+        }
       }
-    }
+    },
   );
 
   let openInBrowserCommand = vscode.commands.registerCommand(
-    "vscode-api-viewer.openInBrowser",
+    'vscode-api-viewer.openInBrowser',
     (node) => {
-      if (node.type === "api") {
-        const props = node.props as ApiNode["props"];
+      if (node.type === 'api') {
+        const props = node.props as APINode['props'];
         let url = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").url
+          vscode.workspace.getConfiguration('api-viewer.yapi').url,
         );
-        url = url.match(/\/$/) ? url : url + "/";
+        url = url.match(/\/$/) ? url : url + '/';
         const pid = _.trim(
-          vscode.workspace.getConfiguration("api-viewer.yapi").pid
+          vscode.workspace.getConfiguration('api-viewer.yapi').pid,
         );
 
         vscode.env.openExternal(
-          vscode.Uri.parse(`${url}project/${pid}/interface/api/${props._id}`)
+          vscode.Uri.parse(`${url}project/${pid}/interface/api/${props._id}`),
         );
       }
-    }
+    },
   );
 
   context.subscriptions.push(updateCommand, insertTypeCodeCommand);
@@ -79,57 +79,57 @@ export function deactivate() {}
 
 async function update() {
   if (apiViewListTree) {
-    apiViewListTree.message = "";
+    apiViewListTree.message = '';
   }
 
   apiGroups = [];
 
-  const email = vscode.workspace.getConfiguration("api-viewer.yapi").email;
-  const password = vscode.workspace.getConfiguration("api-viewer.yapi")
+  const email = vscode.workspace.getConfiguration('api-viewer.yapi').email;
+  const password = vscode.workspace.getConfiguration('api-viewer.yapi')
     .password;
-  let url = _.trim(vscode.workspace.getConfiguration("api-viewer.yapi").url);
-  url = url.match(/\/$/) ? url : url + "/";
-  const pid = _.trim(vscode.workspace.getConfiguration("api-viewer.yapi").pid);
+  let url = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').url);
+  url = url.match(/\/$/) ? url : url + '/';
+  const pid = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').pid);
 
   if (!(email && password && url && pid)) {
     vscode.window.showInformationMessage(
-      "APIViewer: Missing some configurations!"
+      'APIViewer: Missing some configurations!',
     );
     return;
   }
 
-  vscode.window.showInformationMessage("APIViewer: Syncing data from Yapi");
+  vscode.window.showInformationMessage('APIViewer: Syncing data from Yapi');
 
   const response = await got(`${url}api/user/login`, {
-    method: "POST",
+    method: 'POST',
     json: { email, password },
   });
 
   const responseJson = JSON.parse(response.body);
   if (responseJson.errcode === 405) {
     vscode.window.showInformationMessage(
-      "APIViewer: Incorrect account or password"
+      'APIViewer: Incorrect account or password',
     );
   }
 
-  const cookies = response.headers["set-cookie"]?.map((cookie) => {
-    return cookie.split(";")[0];
+  const cookies = response.headers['set-cookie']?.map((cookie) => {
+    return cookie.split(';')[0];
   });
 
   const apiResponse = await got(
     `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
     {
       headers: {
-        cookie: cookies?.join(";"),
+        cookie: cookies?.join(';'),
       },
-    }
+    },
   );
 
   apiGroups = JSON.parse(apiResponse.body) as any[];
 
   if (!apiViewListTree) {
     provider = new TreeNodeProvider(apiGroups);
-    apiViewListTree = vscode.window.createTreeView("api-viewer-list", {
+    apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
       treeDataProvider: provider,
     });
   }
@@ -144,11 +144,11 @@ export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
 
   getChildren(element?: TreeNode): TreeNode[] {
     if (element) {
-      if (element.type === "group") {
+      if (element.type === 'group') {
         return getApiList((element as GroupNode).list);
       }
-      if (element.type === "api") {
-        return getApiProps((element as ApiNode).props);
+      if (element.type === 'api') {
+        return getApiProps((element as APINode).props);
       }
     } else {
       return getGroups();
@@ -166,8 +166,8 @@ function getGroups() {
           group.name,
           group.desc,
           group.list,
-          vscode.TreeItemCollapsibleState.Collapsed
-        )
+          vscode.TreeItemCollapsibleState.Collapsed,
+        ),
       );
     });
   }
@@ -175,16 +175,16 @@ function getGroups() {
 }
 
 function getApiList(list: API[]) {
-  const treeNodes: ApiNode[] = [];
+  const treeNodes: APINode[] = [];
   if (list.length) {
     list.forEach((api) => {
       treeNodes.push(
-        new ApiNode(
+        new APINode(
           api.title,
           api.desc,
           api,
-          vscode.TreeItemCollapsibleState.Collapsed
-        )
+          vscode.TreeItemCollapsibleState.Collapsed,
+        ),
       );
     });
   }
@@ -195,24 +195,24 @@ function getApiProps(props: API) {
   const treeNodes: ApiPropsNode[] = [];
   const method = new ApiPropsNode(
     `Method: ${props.method}`,
-    "",
-    vscode.TreeItemCollapsibleState.None
+    '',
+    vscode.TreeItemCollapsibleState.None,
   );
   const path = new ApiPropsNode(
     `Path: ${props.path}`,
-    "",
-    vscode.TreeItemCollapsibleState.None
+    '',
+    vscode.TreeItemCollapsibleState.None,
   );
   const desc = new ApiPropsNode(
     `Desc1: ${props.desc}`,
-    "",
-    vscode.TreeItemCollapsibleState.None
+    '',
+    vscode.TreeItemCollapsibleState.None,
   );
-  const time = dayjs().format("YYYY-MM-DD HH:mm:ss");
+  const time = dayjs().format('YYYY-MM-DD HH:mm:ss');
   const updateTime = new ApiPropsNode(
     `UpdateAt: ${time}`,
-    "",
-    vscode.TreeItemCollapsibleState.None
+    '',
+    vscode.TreeItemCollapsibleState.None,
   );
 
   treeNodes.push(method, path, desc, updateTime);
@@ -224,7 +224,7 @@ export abstract class TreeNode extends vscode.TreeItem {
     public label: string,
     protected desc: string,
     public type: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
     super(label, collapsibleState);
   }
@@ -240,17 +240,17 @@ export abstract class TreeNode extends vscode.TreeItem {
 
 export class GroupNode extends TreeNode {
   iconPath = {
-    light: path.join(__filename, "..", "..", "resources", "folder.svg"),
-    dark: path.join(__filename, "..", "..", "resources", "folder.svg"),
+    light: path.join(__filename, '..', '..', 'resources', 'folder.svg'),
+    dark: path.join(__filename, '..', '..', 'resources', 'folder.svg'),
   };
 
   constructor(
     public label: string,
     desc: string,
     public list: API[],
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
-    super(label, desc, "group", collapsibleState);
+    super(label, desc, 'group', collapsibleState);
   }
 
   get tooltip() {
@@ -262,21 +262,21 @@ export class GroupNode extends TreeNode {
   }
 }
 
-export class ApiNode extends TreeNode {
+export class APINode extends TreeNode {
   iconPath = {
-    light: path.join(__filename, "..", "..", "resources", "api.svg"),
-    dark: path.join(__filename, "..", "..", "resources", "api.svg"),
+    light: path.join(__filename, '..', '..', 'resources', 'api.svg'),
+    dark: path.join(__filename, '..', '..', 'resources', 'api.svg'),
   };
 
   constructor(
     public label: string,
     desc: string,
     public props: API,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
-    super(label, desc, "api", collapsibleState);
+    super(label, desc, 'api', collapsibleState);
     this.label = `${props.method} ${props.path}`;
-    this.contextValue = "ApiNode";
+    this.contextValue = 'APINode';
   }
 
   get tooltip() {
@@ -292,9 +292,9 @@ export class ApiPropsNode extends TreeNode {
   constructor(
     public label: string,
     desc: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
-    super(label, desc, "apiProps", collapsibleState);
+    super(label, desc, 'apiProps', collapsibleState);
   }
 
   get tooltip() {
@@ -306,102 +306,99 @@ export class ApiPropsNode extends TreeNode {
   }
 }
 
-export interface APIGroup {
-  index: number;
-  name: NameElement;
-  desc: string;
-  add_time: number;
-  up_time: number;
-  list: API[];
+function genRequestCode(
+  method: string,
+  path: string,
+  resTypeName = 'ResponseType',
+  methodName = 'requestSomething',
+) {
+  if (['POST', 'PUT'].indexOf(method) > -1) {
+    return `${methodName}(params: Params) {
+    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`, params);
+  }`;
+  } else {
+    return `${methodName}(params: Params) {
+    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`);
+  }`;
+  }
 }
 
-export interface API {
-  query_path: QueryPath;
-  edit_uid: number;
-  status: Status;
-  type: Type;
-  req_body_is_json_schema: boolean;
-  res_body_is_json_schema: boolean;
-  api_opened: boolean;
-  index: number;
-  tag: NameElement[];
-  _id: number;
-  method: Method;
-  title: string;
-  desc: string;
-  path: string;
-  req_params: Req[];
-  req_body_form: ReqBodyForm[];
-  req_headers: ReqHeader[];
-  req_query: Req[];
-  req_body_type: BodyType;
-  res_body_type: BodyType;
-  res_body: string;
-  req_body_other?: string;
-  project_id: number;
-  catid: number;
-  uid: number;
-  add_time: number;
-  up_time: number;
-  __v: number;
+async function insertTypes(
+  editor: vscode.TextEditor,
+  parser: SimpleAstParser,
+  props: APINode['props'],
+  resTypeName: string,
+) {
+  const doc = editor.document;
+  const fullFilePath = editor.document.fileName;
+
+  try {
+    let out = await schemaToTypescript(JSON.parse(props.res_body), resTypeName);
+    out = out.replace(/\s*\[k: string\]:\sunknown;/g, '');
+    const snippetString = new vscode.SnippetString();
+    snippetString.appendText(out);
+    const { importNodes, interfaceNodes } = parser.parseImportsAndTypes(
+      fullFilePath,
+      doc.getText(),
+    );
+    let insertLine = 0;
+    if (importNodes.length) {
+      const lastImportNode = importNodes[importNodes.length - 1];
+      insertLine = lastImportNode.endPosition.line + 1;
+    }
+    if (interfaceNodes.length) {
+      const lastInterfaceNode = interfaceNodes[interfaceNodes.length - 1];
+      insertLine = lastInterfaceNode.endPosition.line + 1;
+    }
+    // 插入类型
+    await editor.insertSnippet(
+      snippetString,
+      new vscode.Position(insertLine, 0),
+    );
+  } catch (e) {}
 }
 
-export enum Method {
-  Delete = "DELETE",
-  Get = "GET",
-  Post = "POST",
-  Put = "PUT",
-}
-
-export interface QueryPath {
-  path: string;
-  params: any[];
-}
-
-export interface ReqBodyForm {
-  required: string;
-  _id: string;
-  name: string;
-  desc: string;
-  type: string;
-}
-
-export enum BodyType {
-  Form = "form",
-  JSON = "json",
-  Raw = "raw",
-}
-
-export interface ReqHeader {
-  required: string;
-  _id: string;
-  name: ReqHeaderName;
-  value?: string;
-}
-
-export enum ReqHeaderName {
-  APIKey = "api_key",
-  ContentType = "Content-Type",
-}
-
-export interface Req {
-  _id: string;
-  name: string;
-  desc: string;
-  required?: string;
-}
-
-export enum Status {
-  Undone = "undone",
-}
-
-export enum NameElement {
-  Pet = "pet",
-  Store = "store",
-  User = "user",
-}
-
-export enum Type {
-  Static = "static",
-  Var = "var",
+function insertMethod(
+  editor: vscode.TextEditor,
+  parser: SimpleAstParser,
+  props: APINode['props'],
+  resTypeName: string,
+  requestMethodName: string,
+) {
+  const doc = editor.document;
+  const fullFilePath = editor.document.fileName;
+  // 插入请求方法
+  const classNodes = parser.parseClass(fullFilePath, doc.getText());
+  if (classNodes.length) {
+    let serviceClass;
+    for (let i = 0; i < classNodes.length; i++) {
+      const className = classNodes[i].declaration.name;
+      if (className?.text.match(/Service$/)) {
+        serviceClass = classNodes[i];
+        break;
+      }
+    }
+    if (serviceClass) {
+      const methods = serviceClass.methods;
+      if (methods.length) {
+        const lastMethod = methods[methods.length - 1];
+        const insertLine = lastMethod.endPosition.line + 1;
+        const method = props.method;
+        const path = props.path;
+        let _snippetString = genRequestCode(
+          method,
+          path,
+          resTypeName,
+          requestMethodName,
+        );
+        _snippetString = '\n  ' + _snippetString + '\n';
+        const snippetString = new vscode.SnippetString();
+        snippetString.appendText(_snippetString);
+        editor.insertSnippet(
+          snippetString,
+          new vscode.Position(insertLine, 0),
+        );
+      }
+    }
+  }
 }
