@@ -32,10 +32,18 @@ export function activate(context: vscode.ExtensionContext) {
   let insertTypeCodeCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.insertTypeCode',
     async (node) => {
+      let resTypeName = await vscode.window.showInputBox({
+        value: 'ResponseDataType',
+        prompt: 'Input type name',
+      });
+      let requestMethodName = await vscode.window.showInputBox({
+        value: 'requestMethod',
+        prompt: 'Input method name',
+      });
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
-        const resTypeName = 'ResponseDataType';
-        const requestMethodName = 'requestMethod';
+        resTypeName = strings.classify(<string>resTypeName);
+        requestMethodName = strings.camelize(<string>requestMethodName);
         const activeTextEditor = vscode.window.activeTextEditor;
         const parser = new SimpleAstParser();
         if (activeTextEditor) {
@@ -152,10 +160,10 @@ export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
   getChildren(element?: TreeNode): TreeNode[] {
     if (element) {
       if (element.type === 'group') {
-        return getApiList((element as GroupNode).list);
+        return getApiList((<GroupNode>element).list);
       }
       if (element.type === 'api') {
-        return getApiProps((element as APINode).props);
+        return getApiProps((<APINode>element).props);
       }
     } else {
       return getGroups();

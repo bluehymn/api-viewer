@@ -144,4 +144,3 @@ export interface ConstructorDeclarationNode extends DeclarationNode {
 export interface ExportDeclarationNode extends DeclarationNode {
   declaration: ts.ExportDeclaration;
 }
-
