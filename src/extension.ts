@@ -354,7 +354,7 @@ function genRequestCode(
   // 暂时只区分 Post Put 与其它 method
   if (['POST', 'PUT'].indexOf(method) > -1) {
     return `${methodName}(${argumentsStr}) {
-    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`, params);
+    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`, reqBody);
   }`;
   } else {
     return `${methodName}(${argumentsStr}) {
