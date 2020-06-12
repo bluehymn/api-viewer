@@ -142,12 +142,18 @@ async function update() {
 
   apiGroups = JSON.parse(apiResponse.body) as any[];
 
-  if (!apiViewListTree) {
-    provider = new TreeNodeProvider(apiGroups);
-    apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
-      treeDataProvider: provider,
-    });
+  if (apiViewListTree) {
+    apiViewListTree.dispose();
   }
+
+  provider = new TreeNodeProvider(apiGroups);
+  apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
+    treeDataProvider: provider,
+  });
+
+  vscode.window.showInformationMessage(
+    'APIViewer: Sync successful',
+  );
 }
 
 export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
