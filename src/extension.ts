@@ -6,14 +6,16 @@ import got from 'got';
 import * as _ from 'lodash';
 import { compile as schemaToTypescript } from 'json-schema-to-typescript';
 import * as dayjs from 'dayjs';
-import { API, APIGroup } from './types';
+import { API, APIGroup, MethodDeclarationNode } from './types';
 import { SimpleAstParser } from './ast-parser';
 import * as strings from './utils/strings';
+import * as ts from 'typescript';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
 let provider: vscode.TreeDataProvider<TreeNode>;
 let onDiskPath: string;
+let reqBodyTypeName = 'ReqBodyType';
 
 export function activate(context: vscode.ExtensionContext) {
   onDiskPath = context.extensionPath;
@@ -96,9 +98,8 @@ async function update() {
   if (apiViewListTree) {
     apiViewListTree.message = '';
   }
-
   apiGroups = [];
-
+  // 读取配置文件
   const email = vscode.workspace.getConfiguration('api-viewer.yapi').email;
   const password = vscode.workspace.getConfiguration('api-viewer.yapi')
     .password;
@@ -142,6 +143,7 @@ async function update() {
 
   apiGroups = JSON.parse(apiResponse.body) as any[];
 
+  // 销毁已创建的TreeView
   if (apiViewListTree) {
     apiViewListTree.dispose();
   }
@@ -151,9 +153,7 @@ async function update() {
     treeDataProvider: provider,
   });
 
-  vscode.window.showInformationMessage(
-    'APIViewer: Sync successful',
-  );
+  vscode.window.showInformationMessage('APIViewer: Sync successful');
 }
 
 export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
@@ -332,17 +332,46 @@ function genRequestCode(
   path: string,
   resTypeName = 'ResponseType',
   methodName = 'requestSomething',
+  pathParams: string[] = [],
+  queryParams: string[] = [],
+  reqBodyTypeName?: string,
 ) {
+  // 拼接参数
+  let argumentsStr = '';
+  if (pathParams.length) {
+    argumentsStr += pathParams.map((i) => i + ': string,').join('');
+  }
+  if (queryParams.length) {
+    if (argumentsStr === '') {
+      argumentsStr += queryParams.map((i) => i + ': string,').join('');
+    }
+  }
+  if (reqBodyTypeName) {
+    argumentsStr += `reqBody: ${reqBodyTypeName}`;
+  }
+
+  argumentsStr.replace(/,$/, '');
+  // 暂时只区分 Post Put 与其它 method
   if (['POST', 'PUT'].indexOf(method) > -1) {
-    return `${methodName}(params: Params) {
+    return `${methodName}(${argumentsStr}) {
     return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`, params);
   }`;
   } else {
-    return `${methodName}(params: Params) {
+    return `${methodName}(${argumentsStr}) {
     return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}\`);
   }`;
   }
 }
+
+/**
+ *
+ * @param editor
+ * @param parser
+ * @param props
+ * @param resTypeName
+ *
+ * 插入到最后一个类型定义或者 import 语句下面一行
+ */
 
 async function insertTypes(
   editor: vscode.TextEditor,
@@ -354,16 +383,39 @@ async function insertTypes(
   const fullFilePath = editor.document.fileName;
 
   try {
-    let out = await schemaToTypescript(
-      JSON.parse(props.res_body),
-      resTypeName,
-      {
-        bannerComment: `/* ${strings.classify(resTypeName)} */`,
-      },
-    );
-    out = out.replace(/\s*\[k: string\]:\sunknown;/g, '');
+    let responseTypeStr = '';
+    if (props.res_body) {
+      responseTypeStr = await schemaToTypescript(
+        JSON.parse(props.res_body),
+        resTypeName,
+        {
+          bannerComment: `/* ${strings.classify(resTypeName)} */`,
+        },
+      );
+      responseTypeStr = responseTypeStr.replace(
+        /\s*\[k: string\]:\sunknown;/g,
+        '',
+      );
+    }
+
+    let reqBodyTypeStr: string = '';
+    // TODO: 参数类型JSON: 取req_body_other, 后续支持form类型
+    if (props.req_body_other) {
+      reqBodyTypeStr = await schemaToTypescript(
+        JSON.parse(props.req_body_other),
+        reqBodyTypeName,
+        {
+          bannerComment: '',
+        },
+      );
+      reqBodyTypeStr = reqBodyTypeStr.replace(
+        /\s*\[k: string\]:\sunknown;/g,
+        '',
+      );
+    }
+
     const snippetString = new vscode.SnippetString();
-    snippetString.appendText('\n' + out);
+    snippetString.appendText('\n' + responseTypeStr + reqBodyTypeStr);
     const { importNodes, interfaceNodes } = parser.parseImportsAndTypes(
       fullFilePath,
       doc.getText(),
@@ -382,10 +434,23 @@ async function insertTypes(
       snippetString,
       new vscode.Position(insertLine, 0),
     );
+    return snippetString;
   } catch (e) {}
 }
 
-function insertMethod(
+/**
+ *
+ * @param editor
+ * @param parser
+ * @param props
+ * @param resTypeName
+ * @param requestMethodName
+ *
+ * 方法将插入到最后 一个 public method 下面一行
+ * 如果没有定义 method, 将插入到 constructor 下面一行
+ */
+
+async function insertMethod(
   editor: vscode.TextEditor,
   parser: SimpleAstParser,
   props: APINode['props'],
@@ -410,13 +475,28 @@ function insertMethod(
       const constructorNode = serviceClass.constructor;
       const method = props.method;
       const path = props.path;
+      const pathParams = props.query_path.params.map((i) => i.name);
+      const queryParams = props.req_query.map((i) => i.name);
       let insertLine = -1;
       if (constructorNode) {
         insertLine = constructorNode.startPosition.line + 1;
       }
       if (methods.length) {
-        const lastMethod = methods[methods.length - 1];
-        insertLine = lastMethod.endPosition.line + 1;
+        let lastPublicMethod: MethodDeclarationNode | null = null;
+        methods.forEach((m) => {
+          let isPrivateMethod = false;
+          ts.forEachChild(m.declaration, (node) => {
+            if (node.kind === ts.SyntaxKind.PrivateKeyword) {
+              isPrivateMethod = true;
+            }
+          });
+          if (!isPrivateMethod) {
+            lastPublicMethod = m;
+          }
+        });
+        if (lastPublicMethod) {
+          insertLine = (<MethodDeclarationNode>lastPublicMethod).endPosition.line + 1;
+        }
       }
       if (insertLine > 0) {
         let _snippetString = genRequestCode(
@@ -424,6 +504,9 @@ function insertMethod(
           path,
           resTypeName,
           requestMethodName,
+          pathParams,
+          queryParams,
+          reqBodyTypeName,
         );
         _snippetString = '\n  ' + _snippetString + '\n';
         const snippetString = new vscode.SnippetString();

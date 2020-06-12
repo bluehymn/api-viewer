@@ -52,7 +52,7 @@ export class SimpleAstParser {
   } {
     const importNodes: ImportDeclarationNode[] = [];
     const interfaceNodes: InterfaceDeclarationNode[] = [];
-    const sourceFileText = sourceText || sourceFile.getText();
+    // const sourceFileText = sourceText || sourceFile.getText();
     const delintNode = (node: ts.Node) => {
       const lines = this.getCodeLineNumbers(node, sourceFile);
 
@@ -64,8 +64,6 @@ export class SimpleAstParser {
             startPosition: lines.startLine,
             endPosition: lines.endLine,
           });
-          // this.getCodeLineNumbers(node, sourceFile);
-          //if we get import declaration then we do not want to do further delinting on the children of the node
           isSkipChildNode = true;
           break;
         case ts.SyntaxKind.InterfaceDeclaration:
@@ -74,8 +72,6 @@ export class SimpleAstParser {
             startPosition: lines.startLine,
             endPosition: lines.endLine,
           });
-          // this.getCodeLineNumbers(node, sourceFile);
-          //if we get import declaration then we do not want to do further delinting on the children of the node
           isSkipChildNode = true;
           break;
         default:
@@ -124,7 +120,7 @@ export class SimpleAstParser {
     delintNode(sourceFile);
     if (classNodes.length) {
       classNodes.forEach((classNode) => {
-        const {methods, constructorNode} = this.delintClassMembers(
+        const { methods, constructorNode } = this.delintClassMembers(
           classNode.declaration,
           sourceFile,
         );
@@ -135,6 +131,9 @@ export class SimpleAstParser {
     return classNodes;
   }
 
+  /**
+   * 解析 class 里面所有的 method 及 constructor
+   */
   private delintClassMembers(
     node: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
