@@ -1,5 +1,5 @@
-import * as ts from "typescript";
-import * as fs from "fs";
+import * as ts from 'typescript';
+import * as fs from 'fs';
 import {
   DeclarationNode,
   ImportDeclarationNode,
@@ -7,12 +7,13 @@ import {
   ClassDeclarationNode,
   MethodDeclarationNode,
   ExportDeclarationNode,
-} from "./types";
+  ConstructorDeclarationNode,
+} from './types';
 
 export class SimpleAstParser {
   public parseImportsAndTypes(
     fullFilePath: string,
-    sourceText: string
+    sourceText: string,
   ): {
     importNodes: ImportDeclarationNode[];
     interfaceNodes: InterfaceDeclarationNode[];
@@ -20,7 +21,7 @@ export class SimpleAstParser {
     if (
       sourceText !== null &&
       sourceText !== undefined &&
-      sourceText.trim() === ""
+      sourceText.trim() === ''
     ) {
       return {
         importNodes: [],
@@ -38,13 +39,13 @@ export class SimpleAstParser {
       fullFilePath,
       sourceText,
       ts.ScriptTarget.Latest,
-      false
+      false,
     );
   }
 
   private delintImportsAndTypes(
     sourceFile: ts.SourceFile,
-    sourceText?: string
+    sourceText?: string,
   ): {
     importNodes: ImportDeclarationNode[];
     interfaceNodes: InterfaceDeclarationNode[];
@@ -92,7 +93,7 @@ export class SimpleAstParser {
     if (
       sourceText !== null &&
       sourceText !== undefined &&
-      sourceText.trim() === ""
+      sourceText.trim() === ''
     ) {
       return [];
     }
@@ -111,6 +112,7 @@ export class SimpleAstParser {
           declaration: node as ts.ClassDeclaration,
           startPosition: lines.startLine,
           endPosition: lines.endLine,
+          constructor: null,
           methods: [],
         });
         isSkipChildNode = true;
@@ -122,42 +124,55 @@ export class SimpleAstParser {
     delintNode(sourceFile);
     if (classNodes.length) {
       classNodes.forEach((classNode) => {
-        classNode.methods = this.delintClassFunctionMembers(
+        const {methods, constructorNode} = this.delintClassMembers(
           classNode.declaration,
-          sourceFile
+          sourceFile,
         );
+        classNode.methods = methods;
+        classNode.constructor = constructorNode;
       });
     }
     return classNodes;
   }
 
-  private delintClassFunctionMembers(
+  private delintClassMembers(
     node: ts.ClassDeclaration,
-    sourceFile: ts.SourceFile
+    sourceFile: ts.SourceFile,
   ) {
-    const functionMembers: MethodDeclarationNode[] = [];
+    const methodMembers: MethodDeclarationNode[] = [];
+    let constructorMember: ConstructorDeclarationNode | null = null;
     const delintNode = (node: ts.Node) => {
       const lines = this.getCodeLineNumbers(node, sourceFile);
       let isSkipChildNode = false;
       if (node.kind === ts.SyntaxKind.MethodDeclaration) {
-        functionMembers.push({
+        methodMembers.push({
           declaration: node as ts.MethodDeclaration,
           startPosition: lines.startLine,
           endPosition: lines.endLine,
         });
         isSkipChildNode = true;
       }
+      if (node.kind === ts.SyntaxKind.Constructor) {
+        constructorMember = {
+          declaration: node as ts.ConstructorDeclaration,
+          startPosition: lines.startLine,
+          endPosition: lines.endLine,
+        };
+      }
       if (!isSkipChildNode) {
         ts.forEachChild(node, delintNode);
       }
     };
     delintNode(node);
-    return functionMembers;
+    return {
+      methods: methodMembers,
+      constructorNode: constructorMember,
+    };
   }
 
   private getCodeLineNumbers(node: ts.Node, sourceFile: ts.SourceFile) {
     const startLine = sourceFile.getLineAndCharacterOfPosition(
-      node.getStart(sourceFile)
+      node.getStart(sourceFile),
     );
     const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
     return { startLine, endLine };

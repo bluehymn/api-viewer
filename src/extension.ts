@@ -8,6 +8,7 @@ import { compile as schemaToTypescript } from 'json-schema-to-typescript';
 import * as dayjs from 'dayjs';
 import { API, APIGroup } from './types';
 import { SimpleAstParser } from './ast-parser';
+import * as strings from './utils/strings';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -42,7 +43,13 @@ export function activate(context: vscode.ExtensionContext) {
             activeTextEditor.document.languageId === 'typescript';
           if (isTypescript) {
             await insertTypes(activeTextEditor, parser, props, resTypeName);
-            await insertMethod(activeTextEditor, parser, props, resTypeName, requestMethodName);
+            await insertMethod(
+              activeTextEditor,
+              parser,
+              props,
+              resTypeName,
+              requestMethodName,
+            );
           }
         }
       }
@@ -333,10 +340,16 @@ async function insertTypes(
   const fullFilePath = editor.document.fileName;
 
   try {
-    let out = await schemaToTypescript(JSON.parse(props.res_body), resTypeName);
+    let out = await schemaToTypescript(
+      JSON.parse(props.res_body),
+      resTypeName,
+      {
+        bannerComment: `/* ${strings.classify(resTypeName)} */`,
+      },
+    );
     out = out.replace(/\s*\[k: string\]:\sunknown;/g, '');
     const snippetString = new vscode.SnippetString();
-    snippetString.appendText(out);
+    snippetString.appendText('\n' + out);
     const { importNodes, interfaceNodes } = parser.parseImportsAndTypes(
       fullFilePath,
       doc.getText(),
@@ -380,11 +393,18 @@ function insertMethod(
     }
     if (serviceClass) {
       const methods = serviceClass.methods;
+      const constructorNode = serviceClass.constructor;
+      const method = props.method;
+      const path = props.path;
+      let insertLine = -1;
+      if (constructorNode) {
+        insertLine = constructorNode.startPosition.line + 1;
+      }
       if (methods.length) {
         const lastMethod = methods[methods.length - 1];
-        const insertLine = lastMethod.endPosition.line + 1;
-        const method = props.method;
-        const path = props.path;
+        insertLine = lastMethod.endPosition.line + 1;
+      }
+      if (insertLine > 0) {
         let _snippetString = genRequestCode(
           method,
           path,
@@ -394,10 +414,7 @@ function insertMethod(
         _snippetString = '\n  ' + _snippetString + '\n';
         const snippetString = new vscode.SnippetString();
         snippetString.appendText(_snippetString);
-        editor.insertSnippet(
-          snippetString,
-          new vscode.Position(insertLine, 0),
-        );
+        editor.insertSnippet(snippetString, new vscode.Position(insertLine, 0));
       }
     }
   }
