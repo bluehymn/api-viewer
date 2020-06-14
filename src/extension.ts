@@ -512,6 +512,7 @@ async function insertMethod(
         }
       }
       if (insertLine > 0) {
+        const comment = `/* ${props.title} */\n`;
         let _snippetString = genRequestCode(
           method,
           path,
@@ -521,7 +522,7 @@ async function insertMethod(
           queryParams,
           reqBodyTypeName,
         );
-        _snippetString = '\n  ' + _snippetString + '\n';
+        _snippetString =  '\n  ' + comment + '  ' + _snippetString + '\n';
         const snippetString = new vscode.SnippetString();
         snippetString.appendText(_snippetString);
         editor.insertSnippet(snippetString, new vscode.Position(insertLine, 0));
