@@ -10,6 +10,7 @@ import { API, APIGroup, MethodDeclarationNode } from './types';
 import { SimpleAstParser } from './ast-parser';
 import * as strings from './utils/strings';
 import * as ts from 'typescript';
+import * as ejs from 'ejs';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -327,6 +328,13 @@ export class ApiPropsNode extends TreeNode {
   }
 }
 
+const DEFAULT_TEMPLATE = 
+`
+<%= methodName %>(<%= argumentsStr %>) {
+  return this.http.<%= method %><<%= resTypeName %>>('<%= path %><%=queryParamsStr %>'<% if (needReqBody) { %> , reqBody <% } %>);
+}
+`;
+
 function genRequestCode(
   method: string,
   path: string,
@@ -339,6 +347,7 @@ function genRequestCode(
   // 拼接参数
   let argumentsStr = '';
   let queryParamsStr = '';
+  let needReqBody = false;
   if (pathParams.length) {
     argumentsStr += pathParams.map((i) => i + ': string, ').join('');
   }
@@ -346,26 +355,31 @@ function genRequestCode(
     if (argumentsStr === '') {
       argumentsStr += queryParams.map((i) => i + ': string, ').join('');
     }
+    queryParamsStr = '?';
     queryParams.forEach((param, index) => {
       queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${${param}}`;
     });
   }
-
-  let reqBodyStr = '';
   
   // 暂时只区分 Post Put 与其它 method
   if (['POST', 'PUT'].indexOf(method) > -1) {
     if (reqBodyTypeName) {
+      needReqBody = true;
       argumentsStr += `reqBody: ${reqBodyTypeName}`;
     }
-    reqBodyStr = ', reqBody';
   }
   argumentsStr = argumentsStr.replace(/,\s$/, '');
-  return `${methodName}(${argumentsStr}) {
-    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}${
-      queryParamsStr ? '?' : ''
-    }${queryParamsStr}\`${reqBodyStr});
-  }`;
+  method = method.toLowerCase();
+  const str = ejs.render(DEFAULT_TEMPLATE, {
+    methodName,
+    argumentsStr,
+    method,
+    resTypeName,
+    path,
+    queryParamsStr,
+    needReqBody
+  });
+  return str;
 }
 
 /**
