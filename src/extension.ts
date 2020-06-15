@@ -355,7 +355,7 @@ function genRequestCode(
   // 暂时只区分 Post Put 与其它 method
   if (['POST', 'PUT'].indexOf(method) > -1) {
     if (reqBodyTypeName) {
-      argumentsStr += `reqBody: ${reqBodyTypeName}`;
+      argumentsStr += `, reqBody: ${reqBodyTypeName}`;
     }
     return `${methodName}(${argumentsStr}) {
     return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}${
@@ -486,10 +486,16 @@ async function insertMethod(
       const methods = serviceClass.methods;
       const constructorNode = serviceClass.constructor;
       const method = props.method;
-      const path = props.path;
-      const pathParams = props.query_path.params.map((i) => i.name);
+      let path = props.path;
+      const pathParams = props.req_params.map((i) => i.name);
       const queryParams = props.req_query.map((i) => i.name);
       let insertLine = -1;
+      // 将 path 修改成模板字符串
+      if (pathParams.length) {
+        pathParams.forEach(param => {
+          path = path.replace(new RegExp(`{${param}}`), `\${${param}}`);
+        });
+      }
       if (constructorNode) {
         insertLine = constructorNode.startPosition.line + 1;
       }
