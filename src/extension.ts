@@ -351,24 +351,21 @@ function genRequestCode(
     });
   }
 
-  argumentsStr = argumentsStr.replace(/,\s$/, '');
+  let reqBodyStr = '';
+  
   // 暂时只区分 Post Put 与其它 method
   if (['POST', 'PUT'].indexOf(method) > -1) {
     if (reqBodyTypeName) {
-      argumentsStr += `, reqBody: ${reqBodyTypeName}`;
+      argumentsStr += `reqBody: ${reqBodyTypeName}`;
     }
-    return `${methodName}(${argumentsStr}) {
-    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}${
-      queryParamsStr ? '?' : ''
-    }${queryParamsStr}\`, reqBody);
-  }`;
-  } else {
-    return `${methodName}(${argumentsStr}) {
-    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}${
-      queryParamsStr ? '?' : ''
-    }${queryParamsStr}\`);
-  }`;
+    reqBodyStr = ', reqBody';
   }
+  argumentsStr = argumentsStr.replace(/,\s$/, '');
+  return `${methodName}(${argumentsStr}) {
+    return this.http.${method.toLowerCase()}<${resTypeName}>(\`${path}${
+      queryParamsStr ? '?' : ''
+    }${queryParamsStr}\`${reqBodyStr});
+  }`;
 }
 
 /**
