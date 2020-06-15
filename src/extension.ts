@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import * as path from 'path';
+import * as _path_ from 'path';
 import got from 'got';
 import * as _ from 'lodash';
 import { compile as schemaToTypescript } from 'json-schema-to-typescript';
@@ -11,12 +11,14 @@ import { SimpleAstParser } from './ast-parser';
 import * as strings from './utils/strings';
 import * as ts from 'typescript';
 import * as ejs from 'ejs';
+import * as fs from 'fs';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
 let provider: vscode.TreeDataProvider<TreeNode>;
 let onDiskPath: string;
 let reqBodyTypeName = 'ReqBodyType';
+const TEMPLATE_FILE_NAME = 'template.apiviewer';
 
 export function activate(context: vscode.ExtensionContext) {
   onDiskPath = context.extensionPath;
@@ -262,8 +264,8 @@ export abstract class TreeNode extends vscode.TreeItem {
 
 export class GroupNode extends TreeNode {
   iconPath = {
-    light: path.join(__filename, '..', '..', 'resources', 'folder.svg'),
-    dark: path.join(__filename, '..', '..', 'resources', 'folder.svg'),
+    light: _path_.join(__filename, '..', '..', 'resources', 'folder.svg'),
+    dark: _path_.join(__filename, '..', '..', 'resources', 'folder.svg'),
   };
 
   constructor(
@@ -286,8 +288,8 @@ export class GroupNode extends TreeNode {
 
 export class APINode extends TreeNode {
   iconPath = {
-    light: path.join(__filename, '..', '..', 'resources', 'api.svg'),
-    dark: path.join(__filename, '..', '..', 'resources', 'api.svg'),
+    light: _path_.join(__filename, '..', '..', 'resources', 'api.svg'),
+    dark: _path_.join(__filename, '..', '..', 'resources', 'api.svg'),
   };
 
   constructor(
@@ -330,9 +332,9 @@ export class ApiPropsNode extends TreeNode {
 
 const DEFAULT_TEMPLATE = 
 `
-<%= methodName %>(<%= argumentsStr %>) {
-  return this.http.<%= method %><<%= resTypeName %>>('<%= path %><%=queryParamsStr %>'<% if (needReqBody) { %> , reqBody <% } %>);
-}
+  <%= methodName %>(<%= argumentsStr %>) {
+    return this.http.<%= method %><<%= resTypeName %>>('<%= path %><%=queryParamsStr %>'<% if (needReqBody) { %> , reqBody <% } %>);
+  }
 `;
 
 function genRequestCode(
@@ -344,6 +346,19 @@ function genRequestCode(
   queryParams: string[] = [],
   reqBodyTypeName?: string,
 ) {
+  // 读取模板文件 {root}/template.apiviewer
+  let templateStr = DEFAULT_TEMPLATE;
+  if (vscode.workspace.rootPath) {
+    const fileFullPath = _path_.join(vscode.workspace.rootPath || '', TEMPLATE_FILE_NAME);
+    const fileBuffer = fs.readFileSync(fileFullPath);
+    const fileStr = fileBuffer.toString();
+    let templateMatches = fileStr.match(/```method([^`]+)```/m);
+    if (templateMatches) {
+      const tmpStr = templateMatches[1];
+      templateStr = tmpStr;
+    }
+  }
+
   // 拼接参数
   let argumentsStr = '';
   let queryParamsStr = '';
@@ -370,7 +385,7 @@ function genRequestCode(
   }
   argumentsStr = argumentsStr.replace(/,\s$/, '');
   method = method.toLowerCase();
-  const str = ejs.render(DEFAULT_TEMPLATE, {
+  const str = ejs.render(templateStr, {
     methodName,
     argumentsStr,
     method,
