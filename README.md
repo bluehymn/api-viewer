@@ -56,10 +56,12 @@ A VSCode extension for view api docs from Yapi or swagger(planing), and insert r
 
 ### 默认模板
 ```
-  <%= method_name %>(<%= params_str %><% if (need_request_body) { %>, reqBody: <%= req_body_type %><% } %>) {
-    return this.http.<%= http_method %><<%= response_type %>>(
-      \`<%- path %><%= query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>
-    );
+  <%= method_name %>(<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) {
+    return this.http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
+  }
+
+  export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
+    return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
   }
 ```
 

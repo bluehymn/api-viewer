@@ -11,11 +11,18 @@ import { APINode } from './tree-view';
 import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
-const DEFAULT_TEMPLATE = `
-  <%= method_name %>(<%= params_str %><% if (need_request_body) { %>, reqBody: <%= req_body_type %><% } %>) {
+const DEFAULT_METHOD_TEMPLATE = `
+  <%= method_name %>(<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) {
     return this.http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
   }
 `;
+
+const DEFAULT_FUNCTION_TEMPLATE = `
+  export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
+    return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
+  }
+`;
+
 /**
  * 模板提供的 data 变量属性
  * @property {string} method_name 方法名
@@ -38,10 +45,10 @@ function genRequestCode(
   methodName = 'requestSomething',
   pathParams: string[] = [],
   queryParams: string[] = [],
-  reqBodyTypeName?: string,
+  reqBodyTypeName: string,
+  templateStr: string
 ) {
   // 读取模板文件
-  let templateStr = DEFAULT_TEMPLATE;
   if (vscode.workspace.rootPath) {
     const configTemplateFilePath = _.trim(
       vscode.workspace.getConfiguration('api-viewer').templateFilePath,
@@ -170,6 +177,10 @@ export async function insertMethod(
       }
       if (insertLine > 0) {
         const comment = `/* ${props.title} */\n`;
+        let templateStr = DEFAULT_FUNCTION_TEMPLATE;
+        if (insertPlace?.label === 'service-class') {
+          templateStr = DEFAULT_METHOD_TEMPLATE;
+        }
         let _snippetString = genRequestCode(
           method,
           path,
@@ -178,6 +189,7 @@ export async function insertMethod(
           pathParams,
           queryParams,
           DEFAULT_REQ_BODY_TYPE_NAME,
+          templateStr
         );
         _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
         const snippetString = new vscode.SnippetString();
