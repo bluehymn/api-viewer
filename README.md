@@ -3,6 +3,7 @@ API Viewer 是一个 VSCode 插件，可以查看 Yapi 或者 swagger(后续支�
 
 A VSCode extension for view api docs from Yapi or swagger(planing), and insert request code snippet of typescript. 
 
+
 ## 配置
 
 ### **api-viewer.yapi.url**
@@ -19,6 +20,8 @@ A VSCode extension for view api docs from Yapi or swagger(planing), and insert r
 
 ### **api-viewer.yapi.templateFilePath**
 模板文件路径(相对于工作目录)
+
+<img src="./docs/config.gif">
 
 例子:
 

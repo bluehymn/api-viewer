@@ -8,6 +8,7 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+docs
 node_modules
 # !node_modules/json-schema-to-typescript
 # !node_modules/cacheable-request

@@ -7,7 +7,7 @@ import * as _ from 'lodash';
 import { SimpleAstParser } from './ast-parser';
 
 import { MethodDeclarationNode } from './types';
-import { APINode } from './extension';
+import { APINode } from './tree-view';
 import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 

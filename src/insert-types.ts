@@ -3,7 +3,7 @@ import { SimpleAstParser } from './ast-parser';
 import { compile as schemaToTypescript } from 'json-schema-to-typescript';
 import * as strings from './utils/strings';
 
-import { APINode } from './extension';
+import { APINode } from './tree-view';
 import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
 
 /**

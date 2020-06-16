@@ -1,5 +1,4 @@
 // The module 'vscode' contains the VS Code extensibility API
-import * as dayjs from 'dayjs';
 import got from 'got';
 import * as _ from 'lodash';
 import * as _path_ from 'path';
@@ -7,16 +6,16 @@ import * as _path_ from 'path';
 import * as vscode from 'vscode';
 
 import { SimpleAstParser } from './ast-parser';
-import { API, APIGroup } from './types';
+import { APIGroup } from './types';
 import * as strings from './utils/strings';
-import {insertMethod} from './insert-method';
-import {insertTypes} from './insert-types';
+import { insertMethod } from './insert-method';
+import { insertTypes } from './insert-types';
 import { DEFAULT_RES_BODY_TYPE_NAME } from './constants';
+import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
 
-let apiGroups: APIGroup[] = [];
+export let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
 let provider: vscode.TreeDataProvider<TreeNode>;
-
 
 const INSERT_POSITION: vscode.QuickPickItem[] = [
   {
@@ -32,16 +31,16 @@ const INSERT_POSITION: vscode.QuickPickItem[] = [
 ];
 
 export function activate(context: vscode.ExtensionContext) {
-  let updateCommand = vscode.commands.registerCommand(
-    'vscode-api-viewer.update',
+  const syncCommand = vscode.commands.registerCommand(
+    'vscode-api-viewer.sync',
     () => {
       (async () => {
-        await update();
+        await sync();
       })();
     },
   );
 
-  let insertTypeCodeCommand = vscode.commands.registerCommand(
+  const insertTypeCodeCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.insertTypeCode',
     async (node) => {
       let resTypeName = await vscode.window.showInputBox({
@@ -84,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  let openInBrowserCommand = vscode.commands.registerCommand(
+  const openInBrowserCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.openInBrowser',
     (node) => {
       if (node.type === 'api') {
@@ -104,15 +103,19 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  context.subscriptions.push(updateCommand, insertTypeCodeCommand);
+  context.subscriptions.push(
+    syncCommand,
+    insertTypeCodeCommand,
+    openInBrowserCommand,
+  );
 
-  update();
+  sync();
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
 
-async function update() {
+async function sync() {
   if (apiViewListTree) {
     apiViewListTree.message = '';
   }
@@ -134,6 +137,7 @@ async function update() {
 
   vscode.window.showInformationMessage('APIViewer: Syncing data from Yapi');
 
+  // 登录获取cookie
   const response = await got(`${url}api/user/login`, {
     method: 'POST',
     json: { email, password },
@@ -150,6 +154,7 @@ async function update() {
     return cookie.split(';')[0];
   });
 
+  // 获取接口文档数据
   const apiResponse = await got(
     `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
     {
@@ -172,175 +177,4 @@ async function update() {
   });
 
   vscode.window.showInformationMessage('APIViewer: Sync successful');
-}
-
-export class TreeNodeProvider implements vscode.TreeDataProvider<TreeNode> {
-  constructor(private groups: any[]) {}
-
-  getTreeItem(element: TreeNode): vscode.TreeItem {
-    return element;
-  }
-
-  getChildren(element?: TreeNode): TreeNode[] {
-    if (element) {
-      if (element.type === 'group') {
-        return getApiList((<GroupNode>element).list);
-      }
-      if (element.type === 'api') {
-        return getApiProps((<APINode>element).props);
-      }
-    } else {
-      return getGroups();
-    }
-    return [];
-  }
-}
-
-function getGroups() {
-  const treeNodes: GroupNode[] = [];
-  if (apiGroups.length) {
-    apiGroups.forEach((group) => {
-      treeNodes.push(
-        new GroupNode(
-          group.name,
-          group.desc,
-          group.list,
-          vscode.TreeItemCollapsibleState.Collapsed,
-        ),
-      );
-    });
-  }
-  return treeNodes;
-}
-
-function getApiList(list: API[]) {
-  const treeNodes: APINode[] = [];
-  if (list.length) {
-    list.forEach((api) => {
-      treeNodes.push(
-        new APINode(
-          api.title,
-          api.desc,
-          api,
-          vscode.TreeItemCollapsibleState.Collapsed,
-        ),
-      );
-    });
-  }
-  return treeNodes;
-}
-
-function getApiProps(props: API) {
-  const treeNodes: ApiPropsNode[] = [];
-  const method = new ApiPropsNode(
-    `Method: ${props.method}`,
-    '',
-    vscode.TreeItemCollapsibleState.None,
-  );
-  const path = new ApiPropsNode(
-    `Path: ${props.path}`,
-    '',
-    vscode.TreeItemCollapsibleState.None,
-  );
-  const desc = new ApiPropsNode(
-    `Desc1: ${props.desc}`,
-    '',
-    vscode.TreeItemCollapsibleState.None,
-  );
-  const time = dayjs().format('YYYY-MM-DD HH:mm:ss');
-  const updateTime = new ApiPropsNode(
-    `UpdateAt: ${time}`,
-    '',
-    vscode.TreeItemCollapsibleState.None,
-  );
-
-  treeNodes.push(method, path, desc, updateTime);
-  return treeNodes;
-}
-
-export abstract class TreeNode extends vscode.TreeItem {
-  constructor(
-    public label: string,
-    protected desc: string,
-    public type: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-  ) {
-    super(label, collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
-  }
-}
-
-export class GroupNode extends TreeNode {
-  iconPath = {
-    light: _path_.join(__filename, '..', '..', 'resources', 'folder.svg'),
-    dark: _path_.join(__filename, '..', '..', 'resources', 'folder.svg'),
-  };
-
-  constructor(
-    public label: string,
-    desc: string,
-    public list: API[],
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-  ) {
-    super(label, desc, 'group', collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
-  }
-}
-
-export class APINode extends TreeNode {
-  iconPath = {
-    light: _path_.join(__filename, '..', '..', 'resources', 'api.svg'),
-    dark: _path_.join(__filename, '..', '..', 'resources', 'api.svg'),
-  };
-
-  constructor(
-    public label: string,
-    desc: string,
-    public props: API,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-  ) {
-    super(label, desc, 'api', collapsibleState);
-    this.label = `${props.method} ${props.path}`;
-    this.contextValue = 'APINode';
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.props.title;
-  }
-}
-
-export class ApiPropsNode extends TreeNode {
-  constructor(
-    public label: string,
-    desc: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-  ) {
-    super(label, desc, 'apiProps', collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
-  }
 }
