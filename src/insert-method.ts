@@ -13,7 +13,7 @@ const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
 const DEFAULT_TEMPLATE = `
   <%= method_name %>(<%= params_str %><% if (need_request_body) { %>, reqBody: <%= req_body_type %><% } %>) {
-    return this.http.<%= http_method %><<%= response_type %>>(\`<%- path %><%= query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
+    return this.http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
   }
 `;
 /**
@@ -46,17 +46,20 @@ function genRequestCode(
     const configTemplateFilePath = _.trim(
       vscode.workspace.getConfiguration('api-viewer').templateFilePath,
     );
-    const fileFullPath = _path_.join(
-      vscode.workspace.rootPath || '',
-      configTemplateFilePath || DEFAULT_TEMPLATE_FILE_PATH,
-    );
-    const fileBuffer = fs.readFileSync(fileFullPath);
-    const fileStr = fileBuffer.toString();
-    let templateMatches = fileStr.match(/```method((.|[\r\n\s])+)```/m);
-    if (templateMatches) {
-      const tmpStr = templateMatches[1];
-      templateStr = tmpStr;
+    if (configTemplateFilePath) {
+      const fileFullPath = _path_.join(
+        vscode.workspace.rootPath || '',
+        configTemplateFilePath || DEFAULT_TEMPLATE_FILE_PATH,
+      );
+      const fileBuffer = fs.readFileSync(fileFullPath);
+      const fileStr = fileBuffer.toString();
+      let templateMatches = fileStr.match(/```method((.|[\r\n\s])+)```/m);
+      if (templateMatches) {
+        const tmpStr = templateMatches[1];
+        templateStr = tmpStr;
+      }
     }
+
   }
 
   // 拼接参数
