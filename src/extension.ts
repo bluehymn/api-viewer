@@ -1,30 +1,37 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
-import * as _path_ from 'path';
+import * as dayjs from 'dayjs';
 import got from 'got';
 import * as _ from 'lodash';
-import { compile as schemaToTypescript } from 'json-schema-to-typescript';
-import * as dayjs from 'dayjs';
-import { API, APIGroup, MethodDeclarationNode } from './types';
+import * as _path_ from 'path';
+// Import the module and reference it with the alias vscode in your code below
+import * as vscode from 'vscode';
+
 import { SimpleAstParser } from './ast-parser';
+import { API, APIGroup } from './types';
 import * as strings from './utils/strings';
-import * as ts from 'typescript';
-import * as ejs from 'ejs';
-import * as fs from 'fs';
+import {insertMethod} from './insert-method';
+import {insertTypes} from './insert-types';
+import { DEFAULT_RES_BODY_TYPE_NAME } from './constants';
 
 let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
 let provider: vscode.TreeDataProvider<TreeNode>;
-let onDiskPath: string;
-let reqBodyTypeName = 'ReqBodyType';
-const TEMPLATE_FILE_NAME = 'template.apiviewer';
+
+
+const INSERT_POSITION: vscode.QuickPickItem[] = [
+  {
+    label: 'cursor-position',
+    description: 'insert at cursor position',
+    picked: true,
+  },
+  {
+    label: 'service-class',
+    description:
+      "insert into angular service class which with a 'Service' suffix",
+  },
+];
 
 export function activate(context: vscode.ExtensionContext) {
-  onDiskPath = context.extensionPath;
-  console.log(
-    'Congratulations, your extension "vscode-api-viewer" is now active!',
-  );
   let updateCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.update',
     () => {
@@ -38,13 +45,20 @@ export function activate(context: vscode.ExtensionContext) {
     'vscode-api-viewer.insertTypeCode',
     async (node) => {
       let resTypeName = await vscode.window.showInputBox({
-        value: 'ResponseDataType',
+        value: DEFAULT_RES_BODY_TYPE_NAME,
         prompt: 'Input type name',
       });
+
       let requestMethodName = await vscode.window.showInputBox({
         value: 'requestMethod',
         prompt: 'Input method name',
       });
+
+      let insertPosition = await vscode.window.showQuickPick(INSERT_POSITION, {
+        placeHolder: `Which place do you want insert the request method?`,
+        ignoreFocusOut: true,
+      });
+
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
         resTypeName = strings.classify(<string>resTypeName);
@@ -62,6 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
               props,
               resTypeName,
               requestMethodName,
+              insertPosition,
             );
           }
         }
@@ -327,238 +342,5 @@ export class ApiPropsNode extends TreeNode {
 
   get description(): string {
     return this.desc;
-  }
-}
-
-const DEFAULT_TEMPLATE = 
-`
-  <%= methodName %>(<%= argumentsStr %>) {
-    return this.http.<%= method %><<%= resTypeName %>>('<%= path %><%=queryParamsStr %>'<% if (needReqBody) { %> , reqBody <% } %>);
-  }
-`;
-
-function genRequestCode(
-  method: string,
-  path: string,
-  resTypeName = 'ResponseType',
-  methodName = 'requestSomething',
-  pathParams: string[] = [],
-  queryParams: string[] = [],
-  reqBodyTypeName?: string,
-) {
-  // 读取模板文件 {root}/template.apiviewer
-  let templateStr = DEFAULT_TEMPLATE;
-  if (vscode.workspace.rootPath) {
-    const fileFullPath = _path_.join(vscode.workspace.rootPath || '', TEMPLATE_FILE_NAME);
-    const fileBuffer = fs.readFileSync(fileFullPath);
-    const fileStr = fileBuffer.toString();
-    let templateMatches = fileStr.match(/```method([^`]+)```/m);
-    if (templateMatches) {
-      const tmpStr = templateMatches[1];
-      templateStr = tmpStr;
-    }
-  }
-
-  // 拼接参数
-  let argumentsStr = '';
-  let queryParamsStr = '';
-  let needReqBody = false;
-  if (pathParams.length) {
-    argumentsStr += pathParams.map((i) => i + ': string, ').join('');
-  }
-  if (queryParams.length) {
-    if (argumentsStr === '') {
-      argumentsStr += queryParams.map((i) => i + ': string, ').join('');
-    }
-    queryParamsStr = '?';
-    queryParams.forEach((param, index) => {
-      queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${${param}}`;
-    });
-  }
-  
-  // 暂时只区分 Post Put 与其它 method
-  if (['POST', 'PUT'].indexOf(method) > -1) {
-    if (reqBodyTypeName) {
-      needReqBody = true;
-      argumentsStr += `reqBody: ${reqBodyTypeName}`;
-    }
-  }
-  argumentsStr = argumentsStr.replace(/,\s$/, '');
-  method = method.toLowerCase();
-  const str = ejs.render(templateStr, {
-    methodName,
-    argumentsStr,
-    method,
-    resTypeName,
-    path,
-    queryParamsStr,
-    needReqBody
-  });
-  return str;
-}
-
-/**
- *
- * @param editor
- * @param parser
- * @param props
- * @param resTypeName
- *
- * 插入到最后一个类型定义或者 import 语句下面一行
- */
-
-async function insertTypes(
-  editor: vscode.TextEditor,
-  parser: SimpleAstParser,
-  props: APINode['props'],
-  resTypeName: string,
-) {
-  const doc = editor.document;
-  const fullFilePath = editor.document.fileName;
-
-  try {
-    let responseTypeStr = '';
-    if (props.res_body) {
-      let resBodyJson;
-      try {
-        resBodyJson = JSON.parse(props.res_body);
-        responseTypeStr = await schemaToTypescript(
-          JSON.parse(props.res_body),
-          resTypeName,
-          {
-            bannerComment: `/* ${strings.classify(resTypeName)} */`,
-          },
-        );
-        responseTypeStr = responseTypeStr.replace(
-          /\s*\[k: string\]:\sunknown;/g,
-          '',
-        );
-      } catch (e) {}
-    }
-
-    let reqBodyTypeStr: string = '';
-    // TODO: 参数类型JSON: 取req_body_other, 后续支持form类型
-    if (props.req_body_other) {
-      reqBodyTypeStr = await schemaToTypescript(
-        JSON.parse(props.req_body_other),
-        reqBodyTypeName,
-        {
-          bannerComment: '',
-        },
-      );
-      reqBodyTypeStr = reqBodyTypeStr.replace(
-        /\s*\[k: string\]:\sunknown;/g,
-        '',
-      );
-    }
-
-    const snippetString = new vscode.SnippetString();
-    snippetString.appendText('\n' + responseTypeStr + reqBodyTypeStr);
-    const { importNodes, interfaceNodes } = parser.parseImportsAndTypes(
-      fullFilePath,
-      doc.getText(),
-    );
-    let insertLine = 0;
-    if (importNodes.length) {
-      const lastImportNode = importNodes[importNodes.length - 1];
-      insertLine = lastImportNode.endPosition.line + 1;
-    }
-    if (interfaceNodes.length) {
-      const lastInterfaceNode = interfaceNodes[interfaceNodes.length - 1];
-      insertLine = lastInterfaceNode.endPosition.line + 1;
-    }
-    // 插入类型
-    await editor.insertSnippet(
-      snippetString,
-      new vscode.Position(insertLine, 0),
-    );
-    return snippetString;
-  } catch (e) {}
-}
-
-/**
- *
- * @param editor
- * @param parser
- * @param props
- * @param resTypeName
- * @param requestMethodName
- *
- * 方法将插入到最后 一个 public method 下面一行
- * 如果没有定义 method, 将插入到 constructor 下面一行
- */
-
-async function insertMethod(
-  editor: vscode.TextEditor,
-  parser: SimpleAstParser,
-  props: APINode['props'],
-  resTypeName: string,
-  requestMethodName: string,
-) {
-  const doc = editor.document;
-  const fullFilePath = editor.document.fileName;
-  // 插入请求方法
-  const classNodes = parser.parseClass(fullFilePath, doc.getText());
-  if (classNodes.length) {
-    let serviceClass;
-    for (let i = 0; i < classNodes.length; i++) {
-      const className = classNodes[i].declaration.name;
-      if (className?.text.match(/Service$/)) {
-        serviceClass = classNodes[i];
-        break;
-      }
-    }
-    if (serviceClass) {
-      const methods = serviceClass.methods;
-      const constructorNode = serviceClass.constructor;
-      const method = props.method;
-      let path = props.path;
-      const pathParams = props.req_params.map((i) => i.name);
-      const queryParams = props.req_query.map((i) => i.name);
-      let insertLine = -1;
-      // 将 path 修改成模板字符串
-      if (pathParams.length) {
-        pathParams.forEach(param => {
-          path = path.replace(new RegExp(`{${param}}`), `\${${param}}`);
-        });
-      }
-      if (constructorNode) {
-        insertLine = constructorNode.startPosition.line + 1;
-      }
-      if (methods.length) {
-        let lastPublicMethod: MethodDeclarationNode | null = null;
-        methods.forEach((m) => {
-          let isPrivateMethod = false;
-          ts.forEachChild(m.declaration, (node) => {
-            if (node.kind === ts.SyntaxKind.PrivateKeyword) {
-              isPrivateMethod = true;
-            }
-          });
-          if (!isPrivateMethod) {
-            lastPublicMethod = m;
-          }
-        });
-        if (lastPublicMethod) {
-          insertLine =
-            (<MethodDeclarationNode>lastPublicMethod).endPosition.line + 1;
-        }
-      }
-      if (insertLine > 0) {
-        const comment = `/* ${props.title} */\n`;
-        let _snippetString = genRequestCode(
-          method,
-          path,
-          resTypeName,
-          requestMethodName,
-          pathParams,
-          queryParams,
-          reqBodyTypeName,
-        );
-        _snippetString =  '\n  ' + comment + '  ' + _snippetString + '\n';
-        const snippetString = new vscode.SnippetString();
-        snippetString.appendText(_snippetString);
-        editor.insertSnippet(snippetString, new vscode.Position(insertLine, 0));
-      }
-    }
   }
 }

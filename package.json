@@ -113,6 +113,11 @@
           "default": "",
           "type": "string",
           "markdownDescription": "Yapi项目ID"
+        },
+        "api-viewer.templateFilePath": {
+          "default": "",
+          "type": "string",
+          "markdownDescription": "模板文件路径(相对于工作目录)"
         }
       }
     }

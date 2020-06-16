@@ -1,9 +1,8 @@
 # Change Log
 
-All notable changes to the "vscode-api-viewer" extension will be documented in this file.
+## 0.1.3
+1、支持使用 ejs 模板定义输出代码
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+2、选择接口请求方法的插入位置
 
-## [Unreleased]
-
-- Initial release
+3、修复bug
