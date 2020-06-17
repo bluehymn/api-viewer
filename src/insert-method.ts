@@ -18,9 +18,9 @@ const DEFAULT_METHOD_TEMPLATE = `
 `;
 
 const DEFAULT_FUNCTION_TEMPLATE = `
-  export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
-    return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
-  }
+export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
+  return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
+}
 `;
 
 /**
@@ -45,7 +45,7 @@ function genRequestCode(
   methodName = 'requestSomething',
   pathParams: string[] = [],
   queryParams: string[] = [],
-  reqBodyTypeName: string,
+  reqBodyTypeName: string | null,
   templateStr: string
 ) {
   // 读取模板文件
@@ -102,7 +102,7 @@ function genRequestCode(
     response_type: resTypeName,
     path,
     query_params_str: queryParamsStr,
-    need_request_body: needReqBody,
+    need_request_body: needReqBody && reqBodyTypeName,
   });
   return str;
 }
@@ -147,6 +147,7 @@ export async function insertMethod(
       let path = props.path;
       const pathParams = props.req_params.map((i) => i.name);
       const queryParams = props.req_query.map((i) => i.name);
+      const needReqBody = props.req_body_other;
       let insertLine = -1;
       // 将 path 修改成模板字符串
       if (pathParams.length) {
@@ -188,7 +189,7 @@ export async function insertMethod(
           requestMethodName,
           pathParams,
           queryParams,
-          DEFAULT_REQ_BODY_TYPE_NAME,
+          needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
           templateStr
         );
         _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
