@@ -12,6 +12,7 @@ import { insertMethod } from './insert-method';
 import { insertTypes } from './insert-types';
 import { DEFAULT_RES_BODY_TYPE_NAME } from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
+import { importJson } from './swagger';
 
 export let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -120,6 +121,28 @@ async function sync() {
     apiViewListTree.message = '';
   }
   apiGroups = [];
+
+  const swaggerJsonUrl = vscode.workspace.getConfiguration('api-viewer.swagger').url;
+  if (swaggerJsonUrl) {
+    importJson(swaggerJsonUrl);
+  } else {
+    syncFromYapi();
+  }
+
+  // 销毁已创建的TreeView
+  if (apiViewListTree) {
+    apiViewListTree.dispose();
+  }
+
+  provider = new TreeNodeProvider(apiGroups);
+  apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
+    treeDataProvider: provider,
+  });
+
+  vscode.window.showInformationMessage('APIViewer: Sync successful');
+}
+
+async function syncFromYapi() {
   // 读取配置文件
   const email = vscode.workspace.getConfiguration('api-viewer.yapi').email;
   const password = vscode.workspace.getConfiguration('api-viewer.yapi')
@@ -165,16 +188,4 @@ async function sync() {
   );
 
   apiGroups = JSON.parse(apiResponse.body) as any[];
-
-  // 销毁已创建的TreeView
-  if (apiViewListTree) {
-    apiViewListTree.dispose();
-  }
-
-  provider = new TreeNodeProvider(apiGroups);
-  apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
-    treeDataProvider: provider,
-  });
-
-  vscode.window.showInformationMessage('APIViewer: Sync successful');
 }

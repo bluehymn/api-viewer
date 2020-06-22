@@ -114,6 +114,11 @@
           "type": "string",
           "markdownDescription": "Yapi项目ID"
         },
+        "api-viewer.swagger.url": {
+          "default": "",
+          "type": "string",
+          "markdownDescription": "swagger json 地址"
+        },
         "api-viewer.templateFilePath": {
           "default": "",
           "type": "string",
@@ -159,6 +164,7 @@
     "got": "^11.3.0",
     "json-schema-to-typescript": "^9.1.0",
     "lodash": "^4.17.15",
-    "prettier": "^2.0.5"
+    "prettier": "^2.0.5",
+    "swagger-parser": "^9.0.1"
   }
 }
