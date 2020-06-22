@@ -124,9 +124,9 @@ async function sync() {
 
   const swaggerJsonUrl = vscode.workspace.getConfiguration('api-viewer.swagger').url;
   if (swaggerJsonUrl) {
-    importJson(swaggerJsonUrl);
+    await importJson(swaggerJsonUrl);
   } else {
-    syncFromYapi();
+    await syncFromYapi();
   }
 
   // 销毁已创建的TreeView
