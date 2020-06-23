@@ -1,15 +1,17 @@
 import * as SwaggerParser from 'swagger-parser';
-import * as vscode from 'vscode';
 
-export async function importJson(url: string) {
-  SwaggerParser.validate(url, (err, api) => {
-    if (err) {
-      vscode.window.showInformationMessage(
-        'APIViewer: Import failed',
-      );
-    } else {
-      const paths = api?.paths;
-      console.log(paths);
-    }
+export function importJson(url: string) {
+  let paths;
+  return new Promise((resolve, reject) => {
+    SwaggerParser.validate(url, (err, api) => {
+      if (err) {
+        reject();
+        // vscode.window.showInformationMessage('APIViewer: Import failed');
+      } else {
+        paths = api?.paths;
+        console.log(api);
+        resolve(paths);
+      }
+    });
   });
 }
