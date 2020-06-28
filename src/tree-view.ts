@@ -73,7 +73,7 @@ function getApiProps(props: API) {
     vscode.TreeItemCollapsibleState.None,
   );
   const desc = new ApiPropsNode(
-    `Desc1: ${props.desc}`,
+    `Desc: ${props.desc}`,
     '',
     vscode.TreeItemCollapsibleState.None,
   );

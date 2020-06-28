@@ -1,5 +1,4 @@
 // The module 'vscode' contains the VS Code extensibility API
-import got from 'got';
 import * as _ from 'lodash';
 import * as _path_ from 'path';
 // Import the module and reference it with the alias vscode in your code below
@@ -12,7 +11,8 @@ import { insertMethod } from './insert-method';
 import { insertTypes } from './insert-types';
 import { DEFAULT_RES_BODY_TYPE_NAME } from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
-import { importJson } from './swagger';
+import { syncFromSwagger } from './swagger-sync';
+import { syncFromYapi } from './yapi-sync';
 
 export let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -49,15 +49,27 @@ export function activate(context: vscode.ExtensionContext) {
         prompt: 'Input type name',
       });
 
+      if (!resTypeName) {
+        return;
+      }
+
       let requestMethodName = await vscode.window.showInputBox({
         value: 'requestMethod',
         prompt: 'Input method name',
       });
 
+      if (!requestMethodName) {
+        return;
+      }
+
       let insertPosition = await vscode.window.showQuickPick(INSERT_POSITION, {
         placeHolder: `Which place do you want insert the request method?`,
         ignoreFocusOut: true,
       });
+
+      if (!insertPosition) {
+        return;
+      }
 
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
@@ -98,7 +110,9 @@ export function activate(context: vscode.ExtensionContext) {
         );
 
         vscode.env.openExternal(
-          vscode.Uri.parse(`${url}project/${pid}/interface/api/${props._id}`),
+          vscode.Uri.parse(
+            `${url}project/${pid}/interface/api/${props.yapi!.id}`,
+          ),
         );
       }
     },
@@ -117,16 +131,36 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {}
 
 async function sync() {
+  let from = '';
   if (apiViewListTree) {
     apiViewListTree.message = '';
   }
   apiGroups = [];
 
-  const swaggerJsonUrl = vscode.workspace.getConfiguration('api-viewer.swagger').url;
+  const swaggerJsonUrl = vscode.workspace.getConfiguration('api-viewer.swagger')
+    .url;
   if (swaggerJsonUrl) {
-    await importJson(swaggerJsonUrl);
+    from = 'Swagger';
+    vscode.commands.executeCommand(
+      'setContext',
+      'api-platform',
+      'Swagger'
+    );
+    apiGroups = await syncFromSwagger(swaggerJsonUrl);
   } else {
-    await syncFromYapi();
+    from = 'Yapi';
+    vscode.commands.executeCommand(
+      'setContext',
+      'api-platform',
+      'Yapi'
+    );
+    const result = await syncFromYapi();
+    if (result instanceof Error) {
+      vscode.window.showInformationMessage(result.message);
+      return;
+    } else {
+      apiGroups = result;
+    }
   }
 
   // 销毁已创建的TreeView
@@ -139,53 +173,7 @@ async function sync() {
     treeDataProvider: provider,
   });
 
-  vscode.window.showInformationMessage('APIViewer: Sync successful');
-}
-
-async function syncFromYapi() {
-  // 读取配置文件
-  const email = vscode.workspace.getConfiguration('api-viewer.yapi').email;
-  const password = vscode.workspace.getConfiguration('api-viewer.yapi')
-    .password;
-  let url = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').url);
-  url = url.match(/\/$/) ? url : url + '/';
-  const pid = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').pid);
-
-  if (!(email && password && url && pid)) {
-    vscode.window.showInformationMessage(
-      'APIViewer: Missing some configurations!',
-    );
-    return;
-  }
-
-  vscode.window.showInformationMessage('APIViewer: Syncing data from Yapi');
-
-  // 登录获取cookie
-  const response = await got(`${url}api/user/login`, {
-    method: 'POST',
-    json: { email, password },
-  });
-
-  const responseJson = JSON.parse(response.body);
-  if (responseJson.errcode === 405) {
-    vscode.window.showInformationMessage(
-      'APIViewer: Incorrect account or password',
-    );
-  }
-
-  const cookies = response.headers['set-cookie']?.map((cookie) => {
-    return cookie.split(';')[0];
-  });
-
-  // 获取接口文档数据
-  const apiResponse = await got(
-    `${url}api/plugin/export?type=json&pid=${pid}&status=all&isWiki=false`,
-    {
-      headers: {
-        cookie: cookies?.join(';'),
-      },
-    },
+  vscode.window.showInformationMessage(
+    `APIViewer: Sync from ${from} successful`,
   );
-
-  apiGroups = JSON.parse(apiResponse.body) as any[];
 }

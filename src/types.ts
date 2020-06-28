@@ -1,103 +1,127 @@
 import * as ts from 'typescript';
-
+import { JSONSchema4 } from 'json-schema';
 export interface APIGroup {
-  index: number;
-  name: NameElement;
+  name: string;
   desc: string;
-  add_time: number;
-  up_time: number;
+  addTime?: number;
+  upTime?: number;
   list: API[];
 }
 
+export type RequestMethod =
+  | 'GET'
+  | 'HEAD'
+  | 'POST'
+  | 'PUT'
+  | 'DELETE'
+  | 'OPTIONS'
+  | 'PATCH';
+
 export interface API {
-  query_path: QueryPath;
-  edit_uid: number;
-  status: Status;
-  type: Type;
-  req_body_is_json_schema: boolean;
-  res_body_is_json_schema: boolean;
-  api_opened: boolean;
-  index: number;
-  tag: NameElement[];
-  _id: number;
-  method: Method;
+  path: string;
   title: string;
   desc: string;
-  path: string;
-  req_params: Req[];
-  req_body_form: ReqBodyForm[];
-  req_headers: ReqHeader[];
-  req_query: Req[];
-  req_body_type: BodyType;
-  res_body_type: BodyType;
-  res_body: string;
-  req_body_other?: string;
-  project_id: number;
-  catid: number;
-  uid: number;
-  add_time: number;
-  up_time: number;
-  __v: number;
+  method: RequestMethod;
+  pathParams: string[];
+  queryParams: string[];
+  resBody: JSONSchema4;
+  reqBody: JSONSchema4 | undefined;
+  yapi?: {
+    id: number;
+  };
 }
 
-export enum Method {
-  Delete = "DELETE",
-  Get = "GET",
-  Post = "POST",
-  Put = "PUT",
-}
+export declare namespace YAPI {
+  export interface YAPIGroup {
+    index: number;
+    name: string;
+    desc: string;
+    list: YapiJSON[];
+  }
+  export interface YapiJSON {
+    query_path: QueryPath;
+    edit_uid: number;
+    status: string;
+    type: string;
+    req_body_is_json_schema: boolean;
+    res_body_is_json_schema: boolean;
+    api_opened: boolean;
+    index: number;
+    tag: string[];
+    _id: number;
+    method: Method;
+    title: string;
+    desc: string;
+    path: string;
+    req_params: Req[];
+    req_body_form: ReqBodyForm[];
+    req_headers: ReqHeader[];
+    req_query: Req[];
+    req_body_type: BodyType;
+    res_body_type: BodyType;
+    res_body: string;
+    req_body_other?: string;
+    project_id: number;
+    catid: number;
+    uid: number;
+    add_time: number;
+    up_time: number;
+    __v: number;
+  }
 
-export interface QueryPath {
-  path: string;
-  params: any[];
-}
+  export enum Method {
+    Delete = 'DELETE',
+    Get = 'GET',
+    Post = 'POST',
+    Put = 'PUT',
+  }
 
-export interface ReqBodyForm {
-  required: string;
-  _id: string;
-  name: string;
-  desc: string;
-  type: string;
-}
+  export interface QueryPath {
+    path: string;
+    params: any[];
+  }
 
-export enum BodyType {
-  Form = "form",
-  JSON = "json",
-  Raw = "raw",
-}
+  export interface ReqBodyForm {
+    required: string;
+    _id: string;
+    name: string;
+    desc: string;
+    type: string;
+  }
 
-export interface ReqHeader {
-  required: string;
-  _id: string;
-  name: ReqHeaderName;
-  value?: string;
-}
+  export enum BodyType {
+    Form = 'form',
+    JSON = 'json',
+    Raw = 'raw',
+  }
 
-export enum ReqHeaderName {
-  APIKey = "api_key",
-  ContentType = "Content-Type",
-}
+  export interface ReqHeader {
+    required: string;
+    _id: string;
+    name: ReqHeaderName;
+    value?: string;
+  }
 
-export interface Req {
-  _id: string;
-  name: string;
-  desc: string;
-  required?: string;
-}
+  export enum ReqHeaderName {
+    APIKey = 'api_key',
+    ContentType = 'Content-Type',
+  }
 
-export enum Status {
-  Undone = "undone",
-}
+  export interface Req {
+    _id: string;
+    name: string;
+    desc: string;
+    required?: string;
+  }
 
-export enum NameElement {
-  Pet = "pet",
-  Store = "store",
-  User = "user",
-}
+  export enum Status {
+    Undone = 'undone',
+  }
 
-export enum Type {
-  Static = "static",
-  Var = "var",
+  export enum Type {
+    Static = 'static',
+    Var = 'var',
+  }
 }
 
 export interface ParsedDeclarations {

@@ -145,9 +145,9 @@ export async function insertMethod(
       const constructorNode = serviceClass.constructor;
       const method = props.method;
       let path = props.path;
-      const pathParams = props.req_params.map((i) => i.name);
-      const queryParams = props.req_query.map((i) => i.name);
-      const needReqBody = props.req_body_other;
+      const pathParams = props.pathParams;
+      const queryParams = props.queryParams;
+      const needReqBody = props.reqBody;
       let insertLine = -1;
       // 将 path 修改成模板字符串
       if (pathParams.length) {

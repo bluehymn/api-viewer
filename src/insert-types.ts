@@ -27,29 +27,27 @@ export async function insertTypes(
 
   try {
     let responseTypeStr = '';
-    if (props.res_body) {
+    if (props.resBody) {
       let resBodyJson;
-      try {
-        resBodyJson = JSON.parse(props.res_body);
-        responseTypeStr = await schemaToTypescript(
-          JSON.parse(props.res_body),
-          resTypeName,
-          {
-            bannerComment: `/* ${strings.classify(resTypeName)} */`,
-          },
-        );
-        responseTypeStr = responseTypeStr.replace(
-          /\s*\[k: string\]:\sunknown;/g,
-          '',
-        );
-      } catch (e) {}
+      resBodyJson = props.resBody;
+      responseTypeStr = await schemaToTypescript(
+        props.resBody,
+        resTypeName,
+        {
+          bannerComment: `/* ${strings.classify(resTypeName)} */`,
+        },
+      );
+      responseTypeStr = responseTypeStr.replace(
+        /\s*\[k: string\]:\sunknown;/g,
+        '',
+      );
     }
 
     let reqBodyTypeStr: string = '';
-    // TODO: 参数类型JSON: 取req_body_other, 后续支持form类型
-    if (props.req_body_other) {
+
+    if (props.reqBody) {
       reqBodyTypeStr = await schemaToTypescript(
-        JSON.parse(props.req_body_other),
+        props.reqBody,
         DEFAULT_REQ_BODY_TYPE_NAME,
         {
           bannerComment: '',

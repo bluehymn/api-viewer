@@ -56,7 +56,7 @@
         },
         {
           "command": "vscode-api-viewer.openInBrowser",
-          "when": "viewItem == APINode",
+          "when": "viewItem == APINode && api-platform == 'Yapi'",
           "group": "inline@2"
         }
       ]
