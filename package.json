@@ -1,7 +1,7 @@
 {
   "name": "vscode-api-viewer",
   "displayName": "API Viewer",
-  "description": "An VSCode extension for view api docs from Yapi or swagger, and inssert code snippet",
+  "description": "A VSCode extension for view api docs from Yapi or swagger, and insert code snippet",
   "publisher": "bluehymn",
   "repository": "https://github.com/bluehymn/api-viewer",
   "version": "0.1.5",
@@ -15,7 +15,6 @@
     "*"
   ],
   "main": "./dist/extension.js",
-  "icon": "resources/icon.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
