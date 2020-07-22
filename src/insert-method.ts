@@ -8,7 +8,7 @@ import { SimpleAstParser } from './ast-parser';
 
 import { MethodDeclarationNode } from './types';
 import { APINode } from './tree-view';
-import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
+import { DEFAULT_REQ_BODY_TYPE_NAME, InsertPosition, ParamsStructureType } from './constants';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
 const DEFAULT_METHOD_TEMPLATE = `
@@ -35,6 +35,7 @@ export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { 
  * @property {string} path - 接口路径
  * @property {array} query_params - query 参数列表
  * @property {string} params_str - 已拼接的入参
+ * @property {object} params_object_str - 对象类型的入参
  * @property {string} query_params_str - 已拼接的 query 参数
  */
 
@@ -46,7 +47,8 @@ function genRequestCode(
   pathParams: string[] = [],
   queryParams: string[] = [],
   reqBodyTypeName: string | null,
-  templateStr: string
+  templateStr: string,
+  paramsStructureType: ParamsStructureType,
 ) {
   // 读取模板文件
   if (vscode.workspace.rootPath) {
@@ -66,23 +68,32 @@ function genRequestCode(
         templateStr = tmpStr;
       }
     }
-
   }
 
   // 拼接参数
   let paramsStr = '';
   let queryParamsStr = '';
+  let paramsObjectTypeStr = '';
   let needReqBody = false;
   if (pathParams.length) {
     paramsStr += pathParams.map((i) => i + ': string, ').join('');
   }
   if (queryParams.length) {
-    if (paramsStr === '') {
+    paramsObjectTypeStr =
+      '{' + queryParams.map((i) => i + ': string;').join('') + '}';
+    if (paramsStructureType === 'Normal') {
       paramsStr += queryParams.map((i) => i + ': string, ').join('');
+    } else {
+      // 插入params及类型
+      paramsStr += ' params:' + paramsObjectTypeStr;
     }
     queryParamsStr = '?';
     queryParams.forEach((param, index) => {
-      queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${${param}}`;
+      if (paramsStructureType === 'Normal') {
+        queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${${param}}`;
+      } else {
+        queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${params.${param}}`;
+      }
     });
   }
 
@@ -126,6 +137,7 @@ export async function insertMethod(
   resTypeName: string,
   requestMethodName: string,
   insertPlace: vscode.QuickPickItem | undefined,
+  paramsStructureType: ParamsStructureType,
 ) {
   const doc = editor.document;
   const fullFilePath = editor.document.fileName;
@@ -179,7 +191,7 @@ export async function insertMethod(
       if (insertLine > 0) {
         const comment = `/* ${props.title} */\n`;
         let templateStr = DEFAULT_FUNCTION_TEMPLATE;
-        if (insertPlace?.label === 'service-class') {
+        if (insertPlace?.label === InsertPosition.AngularServiceClass) {
           templateStr = DEFAULT_METHOD_TEMPLATE;
         }
         let _snippetString = genRequestCode(
@@ -190,19 +202,20 @@ export async function insertMethod(
           pathParams,
           queryParams,
           needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
-          templateStr
+          templateStr,
+          paramsStructureType,
         );
         _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
         const snippetString = new vscode.SnippetString();
         snippetString.appendText(_snippetString);
         if (insertPlace) {
-          if (insertPlace.label === 'service-class') {
+          if (insertPlace.label === InsertPosition.AngularServiceClass) {
             editor.insertSnippet(
               snippetString,
               new vscode.Position(insertLine, 0),
             );
           }
-          if (insertPlace.label === 'cursor-position') {
+          if (insertPlace.label === InsertPosition.CursorPosition) {
             editor.insertSnippet(snippetString);
           }
         } else {

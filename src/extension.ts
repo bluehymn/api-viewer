@@ -9,7 +9,7 @@ import { APIGroup } from './types';
 import * as strings from './utils/strings';
 import { insertMethod } from './insert-method';
 import { insertTypes } from './insert-types';
-import { DEFAULT_RES_BODY_TYPE_NAME } from './constants';
+import { DEFAULT_RES_BODY_TYPE_NAME, InsertPosition, ParamsStructureType } from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
 import { syncFromSwagger } from './swagger-sync';
 import { syncFromYapi } from './yapi-sync';
@@ -20,14 +20,27 @@ let provider: vscode.TreeDataProvider<TreeNode>;
 
 const INSERT_POSITION: vscode.QuickPickItem[] = [
   {
-    label: 'cursor-position',
+    label: InsertPosition.CursorPosition,
     description: 'insert at cursor position',
     picked: true,
   },
   {
-    label: 'service-class',
+    label: InsertPosition.AngularServiceClass,
     description:
       "insert into angular service class which with a 'Service' suffix",
+  },
+];
+
+const PARAMS_TYPE: vscode.QuickPickItem[] = [
+  {
+    label: ParamsStructureType.Object,
+    description: 'Example: method(params: {param1: string; param2: string;}){...}',
+    picked: true,
+  },
+  {
+    label: ParamsStructureType.Normal,
+    description:
+      "Example: method(param1: string, param2: string){...}",
   },
 ];
 
@@ -67,9 +80,16 @@ export function activate(context: vscode.ExtensionContext) {
         ignoreFocusOut: true,
       });
 
+      let paramsStructureTypePick = await vscode.window.showQuickPick(PARAMS_TYPE, {
+        placeHolder: `Which place do you want insert the request method?`,
+        ignoreFocusOut: true,
+      });
+
       if (!insertPosition) {
         return;
       }
+
+      const paramsStructureType = paramsStructureTypePick!.label as ParamsStructureType;
 
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
@@ -89,6 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
               resTypeName,
               requestMethodName,
               insertPosition,
+              paramsStructureType
             );
           }
         }

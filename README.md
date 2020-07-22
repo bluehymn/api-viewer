@@ -1,5 +1,5 @@
 # API Viewer
-API Viewer 是一个 VSCode 插件，可以查看 Yapi 或者 swagger，并且根据文档插入接口请求的 typescript 代码片段。
+API Viewer 是一个 VSCode 插件，可以查看 Yapi 或者 swagger(OpenAPI V2)，并且根据文档插入接口请求的 typescript 代码片段。
 
 A VSCode extension for view api docs from Yapi or swagger, and insert request code snippet of typescript. 
 
@@ -123,7 +123,7 @@ Example:
 ## Change Log
 
 ### v0.1.5
-1、支持导入 swagger
+1、支持导入 swagger(当前仅支持OpenAPI V2)
 
 2、修复 bug
 
