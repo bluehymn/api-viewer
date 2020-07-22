@@ -122,6 +122,9 @@ Example:
 
 ## Change Log
 
+### v0.1.6
+1、接口请求方法支持对象形式入参
+
 ### v0.1.5
 1、支持导入 swagger(当前仅支持OpenAPI V2)
 
