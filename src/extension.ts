@@ -9,7 +9,11 @@ import { APIGroup } from './types';
 import * as strings from './utils/strings';
 import { insertMethod } from './insert-method';
 import { insertTypes } from './insert-types';
-import { DEFAULT_RES_BODY_TYPE_NAME, InsertPosition, ParamsStructureType } from './constants';
+import {
+  DEFAULT_RES_BODY_TYPE_NAME,
+  InsertPosition,
+  ParamsStructureType,
+} from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
 import { syncFromSwagger } from './swagger-sync';
 import { syncFromYapi } from './yapi-sync';
@@ -34,13 +38,13 @@ const INSERT_POSITION: vscode.QuickPickItem[] = [
 const PARAMS_TYPE: vscode.QuickPickItem[] = [
   {
     label: ParamsStructureType.Object,
-    description: 'Example: method(params: {param1: string; param2: string;}){...}',
+    description:
+      'Example: method(params: {param1: string; param2: string;}){...}',
     picked: true,
   },
   {
     label: ParamsStructureType.Normal,
-    description:
-      "Example: method(param1: string, param2: string){...}",
+    description: 'Example: method(param1: string, param2: string){...}',
   },
 ];
 
@@ -80,37 +84,66 @@ export function activate(context: vscode.ExtensionContext) {
         ignoreFocusOut: true,
       });
 
-      let paramsStructureTypePick = await vscode.window.showQuickPick(PARAMS_TYPE, {
-        placeHolder: `Which place do you want insert the request method?`,
-        ignoreFocusOut: true,
-      });
+      let paramsStructureTypePick = await vscode.window.showQuickPick(
+        PARAMS_TYPE,
+        {
+          placeHolder: `Which place do you want insert the request method?`,
+          ignoreFocusOut: true,
+        },
+      );
 
       if (!insertPosition) {
         return;
       }
 
-      const paramsStructureType = paramsStructureTypePick!.label as ParamsStructureType;
+      const paramsStructureType = paramsStructureTypePick!
+        .label as ParamsStructureType;
 
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
         resTypeName = strings.classify(<string>resTypeName);
         requestMethodName = strings.camelize(<string>requestMethodName);
         const activeTextEditor = vscode.window.activeTextEditor;
-        const parser = new SimpleAstParser();
         if (activeTextEditor) {
           const isTypescript =
             activeTextEditor.document.languageId === 'typescript';
           if (isTypescript) {
-            await insertTypes(activeTextEditor, parser, props, resTypeName);
-            await insertMethod(
+            const insertTypesPlan = await insertTypes(
               activeTextEditor,
-              parser,
+              props,
+              resTypeName,
+            );
+            if (insertTypesPlan.line > -1) {
+              await activeTextEditor.insertSnippet(
+                insertTypesPlan.code,
+                new vscode.Position(
+                  insertTypesPlan.line,
+                  insertTypesPlan.character,
+                ),
+              );
+            } else {
+              await activeTextEditor.insertSnippet(insertTypesPlan.code);
+            }
+
+            const insertMethodPlan = await insertMethod(
+              activeTextEditor,
               props,
               resTypeName,
               requestMethodName,
               insertPosition,
-              paramsStructureType
+              paramsStructureType,
             );
+            if (insertMethodPlan.line > -1) {
+              await activeTextEditor.insertSnippet(
+                insertMethodPlan.code,
+                new vscode.Position(
+                  insertMethodPlan.line,
+                  insertMethodPlan.character,
+                ),
+              );
+            } else {
+              await activeTextEditor.insertSnippet(insertMethodPlan.code);
+            }
           }
         }
       }
@@ -162,19 +195,11 @@ async function sync() {
     .url;
   if (swaggerJsonUrl) {
     from = 'Swagger';
-    vscode.commands.executeCommand(
-      'setContext',
-      'api-platform',
-      'Swagger'
-    );
+    vscode.commands.executeCommand('setContext', 'api-platform', 'Swagger');
     apiGroups = await syncFromSwagger(swaggerJsonUrl);
   } else {
     from = 'Yapi';
-    vscode.commands.executeCommand(
-      'setContext',
-      'api-platform',
-      'Yapi'
-    );
+    vscode.commands.executeCommand('setContext', 'api-platform', 'Yapi');
     const result = await syncFromYapi();
     if (result instanceof Error) {
       vscode.window.showInformationMessage(result.message);

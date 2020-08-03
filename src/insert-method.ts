@@ -6,9 +6,13 @@ import * as _path_ from 'path';
 import * as _ from 'lodash';
 import { SimpleAstParser } from './ast-parser';
 
-import { MethodDeclarationNode } from './types';
+import { MethodDeclarationNode, ExecutionPlan, Position } from './types';
 import { APINode } from './tree-view';
-import { DEFAULT_REQ_BODY_TYPE_NAME, InsertPosition, ParamsStructureType } from './constants';
+import {
+  DEFAULT_REQ_BODY_TYPE_NAME,
+  InsertPosition,
+  ParamsStructureType,
+} from './constants';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
 const DEFAULT_METHOD_TEMPLATE = `
@@ -92,7 +96,8 @@ function genRequestCode(
       if (paramsStructureType === 'Normal') {
         queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${${param}}`;
       } else {
-        queryParamsStr += (index === 0 ? '' : '&') + `${param}=\${params.${param}}`;
+        queryParamsStr +=
+          (index === 0 ? '' : '&') + `${param}=\${params.${param}}`;
       }
     });
   }
@@ -118,31 +123,13 @@ function genRequestCode(
   return str;
 }
 
-/**
- *
- * @param editor
- * @param parser
- * @param props
- * @param resTypeName
- * @param requestMethodName
- *
- * 方法将插入到最后 一个 public method 下面一行
- * 如果没有定义 method, 将插入到 constructor 下面一行
- */
-
-export async function insertMethod(
-  editor: vscode.TextEditor,
-  parser: SimpleAstParser,
-  props: APINode['props'],
-  resTypeName: string,
-  requestMethodName: string,
-  insertPlace: vscode.QuickPickItem | undefined,
-  paramsStructureType: ParamsStructureType,
-) {
-  const doc = editor.document;
-  const fullFilePath = editor.document.fileName;
-  // 插入请求方法
-  const classNodes = parser.parseClass(fullFilePath, doc.getText());
+export function getLastMethodPosition(
+  fullFilePath: string,
+  codeText: string,
+): Position {
+  let insertLine = -1;
+  const parser = new SimpleAstParser();
+  const classNodes = parser.parseClass(fullFilePath, codeText);
   if (classNodes.length) {
     let serviceClass;
     for (let i = 0; i < classNodes.length; i++) {
@@ -152,21 +139,10 @@ export async function insertMethod(
         break;
       }
     }
+
     if (serviceClass) {
       const methods = serviceClass.methods;
       const constructorNode = serviceClass.constructor;
-      const method = props.method;
-      let path = props.path;
-      const pathParams = props.pathParams;
-      const queryParams = props.queryParams;
-      const needReqBody = props.reqBody;
-      let insertLine = -1;
-      // 将 path 修改成模板字符串
-      if (pathParams.length) {
-        pathParams.forEach((param) => {
-          path = path.replace(new RegExp(`([^$]){${param}}`), `$1\${${param}}`);
-        });
-      }
       if (constructorNode) {
         insertLine = constructorNode.startPosition.line + 1;
       }
@@ -188,40 +164,84 @@ export async function insertMethod(
             (<MethodDeclarationNode>lastPublicMethod).endPosition.line + 1;
         }
       }
-      if (insertLine > 0) {
-        const comment = `/* ${props.title} */\n`;
-        let templateStr = DEFAULT_FUNCTION_TEMPLATE;
-        if (insertPlace?.label === InsertPosition.AngularServiceClass) {
-          templateStr = DEFAULT_METHOD_TEMPLATE;
-        }
-        let _snippetString = genRequestCode(
-          method,
-          path,
-          resTypeName,
-          requestMethodName,
-          pathParams,
-          queryParams,
-          needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
-          templateStr,
-          paramsStructureType,
-        );
-        _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
-        const snippetString = new vscode.SnippetString();
-        snippetString.appendText(_snippetString);
-        if (insertPlace) {
-          if (insertPlace.label === InsertPosition.AngularServiceClass) {
-            editor.insertSnippet(
-              snippetString,
-              new vscode.Position(insertLine, 0),
-            );
-          }
-          if (insertPlace.label === InsertPosition.CursorPosition) {
-            editor.insertSnippet(snippetString);
-          }
-        } else {
-          editor.insertSnippet(snippetString);
-        }
-      }
     }
   }
+  return {
+    line: insertLine,
+    character: 0,
+  };
 }
+
+/**
+ *
+ * @param editor
+ * @param parser
+ * @param props
+ * @param resTypeName
+ * @param requestMethodName
+ *
+ * 方法将插入到最后 一个 public method 下面一行
+ * 如果没有定义 method, 将插入到 constructor 下面一行
+ */
+
+export async function insertMethod(
+  editor: vscode.TextEditor,
+  props: APINode['props'],
+  resTypeName: string,
+  requestMethodName: string,
+  insertPlace: vscode.QuickPickItem | undefined,
+  paramsStructureType: ParamsStructureType,
+): Promise<ExecutionPlan.InsertCode> {
+  const parser = new SimpleAstParser();
+  const snippetString = new vscode.SnippetString();
+
+  const isInsertInClass =
+    insertPlace?.label === InsertPosition.AngularServiceClass;
+  const isInsertInCursorPlace =
+    insertPlace?.label === InsertPosition.CursorPosition;
+  const codeText = editor.document.getText();
+  const fullFilePath = editor.document.fileName;
+  // 插入请求方法
+  const method = props.method;
+  let path = props.path;
+  const pathParams = props.pathParams;
+  const queryParams = props.queryParams;
+  const needReqBody = props.reqBody;
+  let insertLineInClass = -1;
+  // 将 path 修改成模板字符串
+  if (pathParams.length) {
+    pathParams.forEach((param) => {
+      path = path.replace(new RegExp(`([^$]){${param}}`), `$1\${${param}}`);
+    });
+  }
+  const comment = `/* ${props.title} */\n`;
+  let templateStr = DEFAULT_FUNCTION_TEMPLATE;
+  if (isInsertInClass) {
+    templateStr = DEFAULT_METHOD_TEMPLATE;
+  }
+  let _snippetString = genRequestCode(
+    method,
+    path,
+    resTypeName,
+    requestMethodName,
+    pathParams,
+    queryParams,
+    needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
+    templateStr,
+    paramsStructureType,
+  );
+  _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
+  snippetString.appendText(_snippetString);
+
+  if (isInsertInClass) {
+    const position = getLastMethodPosition(fullFilePath, codeText);
+    insertLineInClass = position.line;
+  }
+
+  return {
+    code: snippetString,
+    line: insertLineInClass,
+    character: 0,
+  };
+}
+

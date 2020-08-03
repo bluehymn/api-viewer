@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import * as vscode from 'vscode';
 import { JSONSchema4 } from 'json-schema';
 export interface APIGroup {
   name: string;
@@ -24,8 +25,8 @@ export interface API {
   method: RequestMethod;
   pathParams: string[];
   queryParams: string[];
-  resBody: JSONSchema4;
-  reqBody: JSONSchema4 | undefined;
+  resBody: JSONSchema4 | null;
+  reqBody: JSONSchema4 | null;
   yapi?: {
     id: number;
   };
@@ -124,6 +125,11 @@ export declare namespace YAPI {
   }
 }
 
+export interface Position {
+  line: number;
+  character: number;
+}
+
 export interface ParsedDeclarations {
   importDeclarations: DeclarationNode[];
   interfaceDeclarations: DeclarationNode[];
@@ -131,8 +137,8 @@ export interface ParsedDeclarations {
 
 export interface DeclarationNode {
   declaration: any;
-  startPosition: { line: number; character: number };
-  endPosition: { line: number; character: number };
+  startPosition: Position;
+  endPosition: Position;
 }
 
 export interface ImportDeclarationNode extends DeclarationNode {
@@ -167,4 +173,12 @@ export interface ConstructorDeclarationNode extends DeclarationNode {
 
 export interface ExportDeclarationNode extends DeclarationNode {
   declaration: ts.ExportDeclaration;
+}
+
+export declare namespace ExecutionPlan {
+  export interface InsertCode {
+    code: vscode.SnippetString;
+    line: number;
+    character: number;
+  }
 }

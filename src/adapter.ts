@@ -1,9 +1,7 @@
 import { APIGroup, YAPI, API, RequestMethod } from './types';
-import { OpenAPI, OpenAPIV3, OpenAPIV2 } from 'openapi-types';
+import { OpenAPIV2 } from 'openapi-types';
 import { JSONSchema4 } from 'json-schema';
 import * as _ from 'lodash';
-
-type OpenAPIPathObject = OpenAPIV3.PathsObject | OpenAPIV2.PathsObject;
 
 export function adapter(data: any, type: 'yapi' | 'swagger') {
   if (type === 'yapi') {
@@ -30,8 +28,8 @@ function transformYapi(data: YAPI.YAPIGroup[]): APIGroup[] {
         const pathParams = i.req_params ? i.req_params.map((p) => p.name) : [];
         const queryParams = i.req_query ? i.req_query.map((p) => p.name) : [];
 
-        let resBodySchema: JSONSchema4 = {};
-        let reqBodySchema: JSONSchema4 = {};
+        let resBodySchema: JSONSchema4 | null = null;
+        let reqBodySchema: JSONSchema4 | null = null;
 
         if (i.res_body) {
           try {
@@ -127,7 +125,7 @@ function createAPIFromOperationObject(
   const queryParams: string[] = [];
   const methodUpperCase = method.toUpperCase() as RequestMethod;
   const defaultRes = o.responses?.default || o.responses['200'];
-  const responseSchema = defaultRes ? (defaultRes as OpenAPIV2.ResponseObject)?.schema : undefined;
+  const responseSchema = defaultRes ? (defaultRes as OpenAPIV2.ResponseObject)?.schema : null;
   const api: API = {
     path: path,
     title: o.summary || '',

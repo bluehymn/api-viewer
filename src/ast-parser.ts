@@ -1,15 +1,14 @@
 import * as ts from 'typescript';
 import * as fs from 'fs';
 import {
-  DeclarationNode,
   ImportDeclarationNode,
   InterfaceDeclarationNode,
   ClassDeclarationNode,
   MethodDeclarationNode,
-  ExportDeclarationNode,
   ConstructorDeclarationNode,
 } from './types';
 
+// 解析文件梳理出相关节点
 export class SimpleAstParser {
   public parseImportsAndTypes(
     fullFilePath: string,
@@ -43,6 +42,7 @@ export class SimpleAstParser {
     );
   }
 
+  // 获取所有import和interface节点
   private delintImportsAndTypes(
     sourceFile: ts.SourceFile,
     sourceText?: string,
@@ -98,6 +98,7 @@ export class SimpleAstParser {
     return this.delintClasses(sourceFile, _sourceText);
   }
 
+  // 获取所有class节点
   private delintClasses(sourceFile: ts.SourceFile, sourceText?: string) {
     const classNodes: ClassDeclarationNode[] = [];
     const delintNode = (node: ts.Node) => {
@@ -169,6 +170,7 @@ export class SimpleAstParser {
     };
   }
 
+  // 获取节点代码的首尾行
   private getCodeLineNumbers(node: ts.Node, sourceFile: ts.SourceFile) {
     const startLine = sourceFile.getLineAndCharacterOfPosition(
       node.getStart(sourceFile),
