@@ -2,10 +2,13 @@ import * as vscode from 'vscode';
 import { SimpleAstParser } from './ast-parser';
 import { compile as schemaToTypescript } from 'json-schema-to-typescript';
 import * as strings from './utils/strings';
-
+import * as fs from 'fs';
+import * as path from 'path';
 import { APINode } from './tree-view';
 import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
 import { ExecutionPlan, Position, API } from './types';
+import { getDomainFullPath } from './utils/domain';
+import { insertCodeAfterLine } from './utils/file';
 
 // 查找最后一个interface的位置, 没有则返回最后一个import的位置，默认返回第一行
 export function getLastInterfacePosition(
@@ -102,5 +105,48 @@ export async function insertTypes(
       line: -1,
       character: 0,
     };
+  }
+}
+
+export async function insertTypesIntoModel(
+  domainName: string,
+  props: APINode['props'],
+  resTypeName: string,
+) {
+  const domainFullPath = getDomainFullPath(domainName);
+  let domainModelDirFullPath = '';
+  let entityFileFullPath = '';
+  let modelFileFullPath = '';
+  let interfacesFileFullPath = '';
+  let entityFileText = '';
+  let modelFileText = '';
+  let interfacesFileText = '';
+
+  if (!domainFullPath) {
+    return undefined;
+  }
+
+  domainModelDirFullPath = domainFullPath + 'model';
+  entityFileFullPath = path.join(domainFullPath, 'model', strings.dasherize(domainName) + '.entity.ts');
+  modelFileFullPath = path.join(domainFullPath, 'model', strings.dasherize(domainName) + '.model.ts');
+  interfacesFileFullPath = path.join(domainFullPath, 'model', 'interfaces.ts');
+  
+  entityFileText = fs.readFileSync(entityFileFullPath).toString();
+  modelFileText = fs.readFileSync(modelFileFullPath).toString();
+  interfacesFileText = fs.readFileSync(modelFileFullPath).toString();
+
+  try {
+    const resTypeEntityStr = await genResponseTypes(props.resBody, resTypeName + 'Entity');
+    const resTypeModelStr = await genResponseTypes(props.resBody, resTypeName + 'Model');
+    const reqBodyParamsTypeStr = await genRequestTypes(props.reqBody);
+    const entityInsertPos = getLastInterfacePosition(entityFileFullPath, entityFileText);
+    const modelInsertPos = getLastInterfacePosition(modelFileFullPath, modelFileText);
+    const interfacesInsertPos = getLastInterfacePosition(interfacesFileFullPath, interfacesFileText);
+
+    insertCodeAfterLine(entityFileFullPath, entityInsertPos.line, resTypeEntityStr);
+    insertCodeAfterLine(modelFileFullPath, modelInsertPos.line, resTypeModelStr);
+    insertCodeAfterLine(interfacesFileFullPath, interfacesInsertPos.line, reqBodyParamsTypeStr);
+  } catch (e) {
+
   }
 }

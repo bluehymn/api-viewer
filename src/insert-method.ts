@@ -10,9 +10,10 @@ import { MethodDeclarationNode, ExecutionPlan, Position } from './types';
 import { APINode } from './tree-view';
 import {
   DEFAULT_REQ_BODY_TYPE_NAME,
-  InsertPosition,
+  InsertReqCodePosition,
   ParamsStructureType,
 } from './constants';
+import { getConfiguration } from './utils/vscode';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
 const DEFAULT_METHOD_TEMPLATE = `
@@ -57,7 +58,7 @@ function genRequestCode(
   // 读取模板文件
   if (vscode.workspace.rootPath) {
     const configTemplateFilePath = _.trim(
-      vscode.workspace.getConfiguration('api-viewer').templateFilePath,
+      getConfiguration('api-viewer', 'templateFilePath') as string,
     );
     if (configTemplateFilePath) {
       const fileFullPath = _path_.join(
@@ -196,9 +197,9 @@ export async function insertMethod(
   const snippetString = new vscode.SnippetString();
 
   const isInsertInClass =
-    insertPlace?.label === InsertPosition.AngularServiceClass;
+    insertPlace?.label === InsertReqCodePosition.AngularServiceClass;
   const isInsertInCursorPlace =
-    insertPlace?.label === InsertPosition.CursorPosition;
+    insertPlace?.label === InsertReqCodePosition.CursorPosition;
   const codeText = editor.document.getText();
   const fullFilePath = editor.document.fileName;
   // 插入请求方法
@@ -244,4 +245,3 @@ export async function insertMethod(
     character: 0,
   };
 }
-

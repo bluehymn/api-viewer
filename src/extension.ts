@@ -8,15 +8,17 @@ import { SimpleAstParser } from './ast-parser';
 import { APIGroup } from './types';
 import * as strings from './utils/strings';
 import { insertMethod } from './insert-method';
-import { insertTypes } from './insert-types';
+import { insertTypes, insertTypesIntoModel } from './insert-types';
 import {
   DEFAULT_RES_BODY_TYPE_NAME,
-  InsertPosition,
+  InsertReqCodePosition,
   ParamsStructureType,
+  InsertMode
 } from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
 import { syncFromSwagger } from './swagger-sync';
 import { syncFromYapi } from './yapi-sync';
+import { getConfiguration } from './utils/vscode';
 
 export let apiGroups: APIGroup[] = [];
 let apiViewListTree: vscode.TreeView<TreeNode>;
@@ -24,14 +26,28 @@ let provider: vscode.TreeDataProvider<TreeNode>;
 
 const INSERT_POSITION: vscode.QuickPickItem[] = [
   {
-    label: InsertPosition.CursorPosition,
+    label: InsertReqCodePosition.CursorPosition,
     description: 'insert at cursor position',
     picked: true,
   },
   {
-    label: InsertPosition.AngularServiceClass,
+    label: InsertReqCodePosition.AngularServiceClass,
     description:
-      "insert into angular service class which with a 'Service' suffix",
+      "Insert into angular service class which with a 'Service' suffix",
+  },
+];
+
+const DOMAIN_INSERT_POSITION = [
+  {
+    label: InsertMode.Domain,
+    description:
+      'Insert types into model files and request code into repository of specified domain folder',
+    picked: true,
+  },
+  {
+    label: InsertMode.Skip,
+    description:
+      'Skip to next',
   },
 ];
 
@@ -49,6 +65,7 @@ const PARAMS_TYPE: vscode.QuickPickItem[] = [
 ];
 
 export function activate(context: vscode.ExtensionContext) {
+  // 同步
   const syncCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.sync',
     () => {
@@ -58,10 +75,34 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+  // 插入代码
   const insertTypeCodeCommand = vscode.commands.registerCommand(
     'vscode-api-viewer.insertTypeCode',
     async (node) => {
-      let resTypeName = await vscode.window.showInputBox({
+      const supportDomain = getConfiguration('api-viewer', 'supportDomain');
+      let insertIntoDomain = false;
+      let insertReqCodePosition;
+      let resTypeName: string | undefined = '';
+      let requestMethodName: string | undefined = '';
+      let domainName: string | undefined;
+
+      if (supportDomain) {
+        const insertMode = await vscode.window.showQuickPick(DOMAIN_INSERT_POSITION, {
+          placeHolder: `Do you want insert code into a domain?`,
+          ignoreFocusOut: true,
+        });
+        if (insertMode && insertMode.label === InsertMode.Domain) {
+          insertIntoDomain = true;
+          domainName = await vscode.window.showInputBox({
+            prompt: 'Input domain name',
+          });
+        }
+        if (!insertMode) {
+          return;
+        }
+      }
+
+      resTypeName = await vscode.window.showInputBox({
         value: DEFAULT_RES_BODY_TYPE_NAME,
         prompt: 'Input type name',
       });
@@ -70,7 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      let requestMethodName = await vscode.window.showInputBox({
+      requestMethodName = await vscode.window.showInputBox({
         value: 'requestMethod',
         prompt: 'Input method name',
       });
@@ -79,10 +120,12 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      let insertPosition = await vscode.window.showQuickPick(INSERT_POSITION, {
-        placeHolder: `Which place do you want insert the request method?`,
-        ignoreFocusOut: true,
-      });
+      if (!insertIntoDomain) {
+        insertReqCodePosition = await vscode.window.showQuickPick(INSERT_POSITION, {
+          placeHolder: `Which place do you want insert the request method?`,
+          ignoreFocusOut: true,
+        });
+      }
 
       let paramsStructureTypePick = await vscode.window.showQuickPick(
         PARAMS_TYPE,
@@ -91,10 +134,6 @@ export function activate(context: vscode.ExtensionContext) {
           ignoreFocusOut: true,
         },
       );
-
-      if (!insertPosition) {
-        return;
-      }
 
       const paramsStructureType = paramsStructureTypePick!
         .label as ParamsStructureType;
@@ -105,44 +144,51 @@ export function activate(context: vscode.ExtensionContext) {
         requestMethodName = strings.camelize(<string>requestMethodName);
         const activeTextEditor = vscode.window.activeTextEditor;
         if (activeTextEditor) {
+          // 只能在 ts 文件中插入代码
           const isTypescript =
             activeTextEditor.document.languageId === 'typescript';
           if (isTypescript) {
-            const insertTypesPlan = await insertTypes(
-              activeTextEditor,
-              props,
-              resTypeName,
-            );
-            if (insertTypesPlan.line > -1) {
-              await activeTextEditor.insertSnippet(
-                insertTypesPlan.code,
-                new vscode.Position(
-                  insertTypesPlan.line,
-                  insertTypesPlan.character,
-                ),
-              );
+            // 在 domain 中插入
+            if (insertIntoDomain) {
+              if (domainName) {
+                insertTypesIntoModel(domainName, props, resTypeName);
+              }
             } else {
-              await activeTextEditor.insertSnippet(insertTypesPlan.code);
-            }
-
-            const insertMethodPlan = await insertMethod(
-              activeTextEditor,
-              props,
-              resTypeName,
-              requestMethodName,
-              insertPosition,
-              paramsStructureType,
-            );
-            if (insertMethodPlan.line > -1) {
-              await activeTextEditor.insertSnippet(
-                insertMethodPlan.code,
-                new vscode.Position(
-                  insertMethodPlan.line,
-                  insertMethodPlan.character,
-                ),
+              const insertTypesPlan = await insertTypes(
+                activeTextEditor,
+                props,
+                resTypeName,
               );
-            } else {
-              await activeTextEditor.insertSnippet(insertMethodPlan.code);
+              if (insertTypesPlan.line > -1) {
+                await activeTextEditor.insertSnippet(
+                  insertTypesPlan.code,
+                  new vscode.Position(
+                    insertTypesPlan.line,
+                    insertTypesPlan.character,
+                  ),
+                );
+              } else {
+                await activeTextEditor.insertSnippet(insertTypesPlan.code);
+              }
+              const insertMethodPlan = await insertMethod(
+                activeTextEditor,
+                props,
+                resTypeName,
+                requestMethodName,
+                insertReqCodePosition,
+                paramsStructureType,
+              );
+              if (insertMethodPlan.line > -1) {
+                await activeTextEditor.insertSnippet(
+                  insertMethodPlan.code,
+                  new vscode.Position(
+                    insertMethodPlan.line,
+                    insertMethodPlan.character,
+                  ),
+                );
+              } else {
+                await activeTextEditor.insertSnippet(insertMethodPlan.code);
+              }
             }
           }
         }
@@ -155,12 +201,10 @@ export function activate(context: vscode.ExtensionContext) {
     (node) => {
       if (node.type === 'api') {
         const props = node.props as APINode['props'];
-        let url = _.trim(
-          vscode.workspace.getConfiguration('api-viewer.yapi').url,
-        );
+        let url = _.trim(getConfiguration('api-viewer.yapi', 'url') as string);
         url = url.match(/\/$/) ? url : url + '/';
         const pid = _.trim(
-          vscode.workspace.getConfiguration('api-viewer.yapi').pid,
+          getConfiguration('api-viewer.yapi', 'pid') as string,
         );
 
         vscode.env.openExternal(
@@ -191,8 +235,10 @@ async function sync() {
   }
   apiGroups = [];
 
-  const swaggerJsonUrl = vscode.workspace.getConfiguration('api-viewer.swagger')
-    .url;
+  const swaggerJsonUrl = getConfiguration(
+    'api-viewer.swagger',
+    'url',
+  ) as string;
   if (swaggerJsonUrl) {
     from = 'Swagger';
     vscode.commands.executeCommand('setContext', 'api-platform', 'Swagger');

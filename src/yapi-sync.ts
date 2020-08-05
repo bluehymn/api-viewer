@@ -3,16 +3,16 @@ import { APIGroup } from './types';
 import * as _ from 'lodash';
 import got from 'got';
 import { adapter } from './adapter';
+import { getConfiguration } from './utils/vscode';
 
 export async function syncFromYapi() {
   let groups: APIGroup[] = [];
   // 读取配置文件
-  const email = vscode.workspace.getConfiguration('api-viewer.yapi').email;
-  const password = vscode.workspace.getConfiguration('api-viewer.yapi')
-    .password;
-  let url = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').url);
+  const email = getConfiguration('api-viewer.yapi', 'email');
+  const password = getConfiguration('api-viewer.yapi', 'password');
+  let url = _.trim(getConfiguration('api-viewer.yapi', 'url') as string);
   url = url.match(/\/$/) ? url : url + '/';
-  const pid = _.trim(vscode.workspace.getConfiguration('api-viewer.yapi').pid);
+  const pid = _.trim(getConfiguration('api-viewer.yapi', 'pid') as string);
 
   if (!(email && password && url && pid)) {
     return new Error('APIViewer: Missing some configurations!');

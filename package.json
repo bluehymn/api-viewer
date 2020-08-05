@@ -123,6 +123,11 @@
           "default": "",
           "type": "string",
           "markdownDescription": "模板文件路径(相对于工作目录)"
+        },
+        "api-viewer.supportDomain": {
+          "default": "",
+          "type": "boolean",
+          "markdownDescription": "支持在domain中插入代码，仅公司项目内部使用"
         }
       }
     }
