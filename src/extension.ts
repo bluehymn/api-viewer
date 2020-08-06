@@ -4,16 +4,15 @@ import * as _path_ from 'path';
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-import { SimpleAstParser } from './ast-parser';
 import { APIGroup } from './types';
 import * as strings from './utils/strings';
-import { insertMethod } from './insert-method';
-import { insertTypes, insertTypesIntoModel } from './insert-types';
+import { createInsertMethodRule } from './insert-method';
+import { createInsertTypesRule, insertTypesIntoModel } from './insert-types';
 import {
   DEFAULT_RES_BODY_TYPE_NAME,
   InsertReqCodePosition,
   ParamsStructureType,
-  InsertMode
+  InsertMode,
 } from './constants';
 import { TreeNode, TreeNodeProvider, APINode } from './tree-view';
 import { syncFromSwagger } from './swagger-sync';
@@ -46,8 +45,7 @@ const DOMAIN_INSERT_POSITION = [
   },
   {
     label: InsertMode.Skip,
-    description:
-      'Skip to next',
+    description: 'Skip to next',
   },
 ];
 
@@ -87,10 +85,13 @@ export function activate(context: vscode.ExtensionContext) {
       let domainName: string | undefined;
 
       if (supportDomain) {
-        const insertMode = await vscode.window.showQuickPick(DOMAIN_INSERT_POSITION, {
-          placeHolder: `Do you want insert code into a domain?`,
-          ignoreFocusOut: true,
-        });
+        const insertMode = await vscode.window.showQuickPick(
+          DOMAIN_INSERT_POSITION,
+          {
+            placeHolder: `Do you want insert code into a domain?`,
+            ignoreFocusOut: true,
+          },
+        );
         if (insertMode && insertMode.label === InsertMode.Domain) {
           insertIntoDomain = true;
           domainName = await vscode.window.showInputBox({
@@ -121,10 +122,13 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       if (!insertIntoDomain) {
-        insertReqCodePosition = await vscode.window.showQuickPick(INSERT_POSITION, {
-          placeHolder: `Which place do you want insert the request method?`,
-          ignoreFocusOut: true,
-        });
+        insertReqCodePosition = await vscode.window.showQuickPick(
+          INSERT_POSITION,
+          {
+            placeHolder: `Which place do you want insert the request method?`,
+            ignoreFocusOut: true,
+          },
+        );
       }
 
       let paramsStructureTypePick = await vscode.window.showQuickPick(
@@ -143,34 +147,30 @@ export function activate(context: vscode.ExtensionContext) {
         resTypeName = strings.classify(<string>resTypeName);
         requestMethodName = strings.camelize(<string>requestMethodName);
         const activeTextEditor = vscode.window.activeTextEditor;
-        if (activeTextEditor) {
-          // 只能在 ts 文件中插入代码
-          const isTypescript =
-            activeTextEditor.document.languageId === 'typescript';
-          if (isTypescript) {
-            // 在 domain 中插入
-            if (insertIntoDomain) {
-              if (domainName) {
-                insertTypesIntoModel(domainName, props, resTypeName);
-              }
-            } else {
-              const insertTypesPlan = await insertTypes(
+        // 在 domain 中插入
+        if (insertIntoDomain) {
+          if (domainName) {
+            insertTypesIntoModel(domainName, props, resTypeName);
+          }
+        } else {
+          if (activeTextEditor) {
+            const isTypescript =
+              activeTextEditor.document.languageId === 'typescript';
+            // 只能在 ts 文件中插入代码
+            if (isTypescript) {
+              const insertTypesRule = await createInsertTypesRule(
                 activeTextEditor,
                 props,
                 resTypeName,
               );
-              if (insertTypesPlan.line > -1) {
-                await activeTextEditor.insertSnippet(
-                  insertTypesPlan.code,
-                  new vscode.Position(
-                    insertTypesPlan.line,
-                    insertTypesPlan.character,
-                  ),
-                );
-              } else {
-                await activeTextEditor.insertSnippet(insertTypesPlan.code);
-              }
-              const insertMethodPlan = await insertMethod(
+              await activeTextEditor.insertSnippet(
+                insertTypesRule.code,
+                new vscode.Position(
+                  insertTypesRule.line,
+                  insertTypesRule.character,
+                ),
+              );
+              const insertMethodRule = await createInsertMethodRule(
                 activeTextEditor,
                 props,
                 resTypeName,
@@ -178,16 +178,23 @@ export function activate(context: vscode.ExtensionContext) {
                 insertReqCodePosition,
                 paramsStructureType,
               );
-              if (insertMethodPlan.line > -1) {
+              const isInsertInAngularServiceClass =
+                insertReqCodePosition?.label ===
+                InsertReqCodePosition.AngularServiceClass;
+              const isInsertInCursorPlace =
+                insertReqCodePosition?.label ===
+                InsertReqCodePosition.CursorPosition;
+              if (isInsertInAngularServiceClass) {
                 await activeTextEditor.insertSnippet(
-                  insertMethodPlan.code,
+                  insertMethodRule.code,
                   new vscode.Position(
-                    insertMethodPlan.line,
-                    insertMethodPlan.character,
+                    insertMethodRule.line,
+                    insertMethodRule.character,
                   ),
                 );
-              } else {
-                await activeTextEditor.insertSnippet(insertMethodPlan.code);
+              }
+              if (isInsertInCursorPlace) {
+                await activeTextEditor.insertSnippet(insertMethodRule.code);
               }
             }
           }

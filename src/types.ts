@@ -175,7 +175,7 @@ export interface ExportDeclarationNode extends DeclarationNode {
   declaration: ts.ExportDeclaration;
 }
 
-export declare namespace ExecutionPlan {
+export declare namespace ExecutionRule {
   export interface InsertCode {
     code: vscode.SnippetString;
     line: number;

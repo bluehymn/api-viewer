@@ -9,6 +9,7 @@ import {
 } from './types';
 
 // 解析文件梳理出相关节点
+// 行号开始于0
 export class SimpleAstParser {
   public parseImportsAndTypes(
     fullFilePath: string,
@@ -28,18 +29,40 @@ export class SimpleAstParser {
       };
     }
     const _sourceText = sourceText || fs.readFileSync(fullFilePath).toString();
-    const sourceFile = this.createSourceFile(fullFilePath, sourceText);
+    const sourceFile = SimpleAstParser.createSourceFile(fullFilePath, sourceText);
     const delinted = this.delintImportsAndTypes(sourceFile, _sourceText);
     return delinted;
   }
 
-  private createSourceFile(fullFilePath: string, sourceText: string) {
+  static createSourceFile(fullFilePath: string, sourceText: string) {
     return ts.createSourceFile(
       fullFilePath,
       sourceText,
       ts.ScriptTarget.Latest,
       false,
     );
+  }
+
+  // 获取节点代码的首尾行
+  static getCodeLineNumbers(node: ts.Node, sourceFile: ts.SourceFile) {
+    const startLineAndCharacter = sourceFile.getLineAndCharacterOfPosition(
+      node.getStart(sourceFile),
+    );
+    const endLineAndCharacter = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+    return { startLineAndCharacter, endLineAndCharacter };
+  }
+
+  public parseClass(fullFilePath: string, sourceText: string) {
+    if (
+      sourceText !== null &&
+      sourceText !== undefined &&
+      sourceText.trim() === ''
+    ) {
+      return [];
+    }
+    const _sourceText = sourceText || fs.readFileSync(fullFilePath).toString();
+    const sourceFile = SimpleAstParser.createSourceFile(fullFilePath, sourceText);
+    return this.delintClasses(sourceFile, _sourceText);
   }
 
   // 获取所有import和interface节点
@@ -54,23 +77,23 @@ export class SimpleAstParser {
     const interfaceNodes: InterfaceDeclarationNode[] = [];
     // const sourceFileText = sourceText || sourceFile.getText();
     const delintNode = (node: ts.Node) => {
-      const lines = this.getCodeLineNumbers(node, sourceFile);
+      const lines = SimpleAstParser.getCodeLineNumbers(node, sourceFile);
 
       let isSkipChildNode = false;
       switch (node.kind) {
         case ts.SyntaxKind.ImportDeclaration:
           importNodes.push({
             declaration: node as ts.ImportDeclaration,
-            startPosition: lines.startLine,
-            endPosition: lines.endLine,
+            startPosition: lines.startLineAndCharacter,
+            endPosition: lines.endLineAndCharacter,
           });
           isSkipChildNode = true;
           break;
         case ts.SyntaxKind.InterfaceDeclaration:
           interfaceNodes.push({
             declaration: node as ts.InterfaceDeclaration,
-            startPosition: lines.startLine,
-            endPosition: lines.endLine,
+            startPosition: lines.startLineAndCharacter,
+            endPosition: lines.endLineAndCharacter,
           });
           isSkipChildNode = true;
           break;
@@ -85,30 +108,17 @@ export class SimpleAstParser {
     return { importNodes, interfaceNodes };
   }
 
-  public parseClass(fullFilePath: string, sourceText: string) {
-    if (
-      sourceText !== null &&
-      sourceText !== undefined &&
-      sourceText.trim() === ''
-    ) {
-      return [];
-    }
-    const _sourceText = sourceText || fs.readFileSync(fullFilePath).toString();
-    const sourceFile = this.createSourceFile(fullFilePath, sourceText);
-    return this.delintClasses(sourceFile, _sourceText);
-  }
-
   // 获取所有class节点
   private delintClasses(sourceFile: ts.SourceFile, sourceText?: string) {
     const classNodes: ClassDeclarationNode[] = [];
     const delintNode = (node: ts.Node) => {
-      const lines = this.getCodeLineNumbers(node, sourceFile);
+      const lines = SimpleAstParser.getCodeLineNumbers(node, sourceFile);
       let isSkipChildNode = false;
       if (node.kind === ts.SyntaxKind.ClassDeclaration) {
         classNodes.push({
           declaration: node as ts.ClassDeclaration,
-          startPosition: lines.startLine,
-          endPosition: lines.endLine,
+          startPosition: lines.startLineAndCharacter,
+          endPosition: lines.endLineAndCharacter,
           constructor: null,
           methods: [],
         });
@@ -142,21 +152,21 @@ export class SimpleAstParser {
     const methodMembers: MethodDeclarationNode[] = [];
     let constructorMember: ConstructorDeclarationNode | null = null;
     const delintNode = (node: ts.Node) => {
-      const lines = this.getCodeLineNumbers(node, sourceFile);
+      const lines = SimpleAstParser.getCodeLineNumbers(node, sourceFile);
       let isSkipChildNode = false;
       if (node.kind === ts.SyntaxKind.MethodDeclaration) {
         methodMembers.push({
           declaration: node as ts.MethodDeclaration,
-          startPosition: lines.startLine,
-          endPosition: lines.endLine,
+          startPosition: lines.startLineAndCharacter,
+          endPosition: lines.endLineAndCharacter,
         });
         isSkipChildNode = true;
       }
       if (node.kind === ts.SyntaxKind.Constructor) {
         constructorMember = {
           declaration: node as ts.ConstructorDeclaration,
-          startPosition: lines.startLine,
-          endPosition: lines.endLine,
+          startPosition: lines.startLineAndCharacter,
+          endPosition: lines.endLineAndCharacter,
         };
       }
       if (!isSkipChildNode) {
@@ -170,12 +180,4 @@ export class SimpleAstParser {
     };
   }
 
-  // 获取节点代码的首尾行
-  private getCodeLineNumbers(node: ts.Node, sourceFile: ts.SourceFile) {
-    const startLine = sourceFile.getLineAndCharacterOfPosition(
-      node.getStart(sourceFile),
-    );
-    const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
-    return { startLine, endLine };
-  }
 }

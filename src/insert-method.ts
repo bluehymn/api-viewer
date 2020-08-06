@@ -6,7 +6,7 @@ import * as _path_ from 'path';
 import * as _ from 'lodash';
 import { SimpleAstParser } from './ast-parser';
 
-import { MethodDeclarationNode, ExecutionPlan, Position } from './types';
+import { MethodDeclarationNode, ExecutionRule, Position } from './types';
 import { APINode } from './tree-view';
 import {
   DEFAULT_REQ_BODY_TYPE_NAME,
@@ -124,7 +124,7 @@ function genRequestCode(
   return str;
 }
 
-export function getLastMethodPosition(
+export function getLastMethodPositionInAngularService(
   fullFilePath: string,
   codeText: string,
 ): Position {
@@ -185,18 +185,19 @@ export function getLastMethodPosition(
  * 如果没有定义 method, 将插入到 constructor 下面一行
  */
 
-export async function insertMethod(
+export async function createInsertMethodRule(
   editor: vscode.TextEditor,
   props: APINode['props'],
   resTypeName: string,
   requestMethodName: string,
   insertPlace: vscode.QuickPickItem | undefined,
   paramsStructureType: ParamsStructureType,
-): Promise<ExecutionPlan.InsertCode> {
+): Promise<ExecutionRule.InsertCode> {
+  let line = 0;
   const parser = new SimpleAstParser();
   const snippetString = new vscode.SnippetString();
 
-  const isInsertInClass =
+  const isInsertInAngularServiceClass =
     insertPlace?.label === InsertReqCodePosition.AngularServiceClass;
   const isInsertInCursorPlace =
     insertPlace?.label === InsertReqCodePosition.CursorPosition;
@@ -208,7 +209,7 @@ export async function insertMethod(
   const pathParams = props.pathParams;
   const queryParams = props.queryParams;
   const needReqBody = props.reqBody;
-  let insertLineInClass = -1;
+  
   // 将 path 修改成模板字符串
   if (pathParams.length) {
     pathParams.forEach((param) => {
@@ -217,7 +218,7 @@ export async function insertMethod(
   }
   const comment = `/* ${props.title} */\n`;
   let templateStr = DEFAULT_FUNCTION_TEMPLATE;
-  if (isInsertInClass) {
+  if (isInsertInAngularServiceClass) {
     templateStr = DEFAULT_METHOD_TEMPLATE;
   }
   let _snippetString = genRequestCode(
@@ -234,14 +235,14 @@ export async function insertMethod(
   _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
   snippetString.appendText(_snippetString);
 
-  if (isInsertInClass) {
-    const position = getLastMethodPosition(fullFilePath, codeText);
-    insertLineInClass = position.line;
+  if (isInsertInAngularServiceClass) {
+    const position = getLastMethodPositionInAngularService(fullFilePath, codeText);
+    line = position.line;
   }
 
   return {
     code: snippetString,
-    line: insertLineInClass,
+    line,
     character: 0,
   };
 }
