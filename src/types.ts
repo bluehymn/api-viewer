@@ -125,6 +125,8 @@ export declare namespace YAPI {
   }
 }
 
+export type MemberModifier = 'public' | 'private' | 'protected';
+
 export interface Position {
   line: number;
   character: number;
@@ -165,6 +167,7 @@ export interface FunctionDeclarationNode extends DeclarationNode {
 
 export interface MethodDeclarationNode extends DeclarationNode {
   declaration: ts.MethodDeclaration;
+  modifier: MemberModifier;
 }
 
 export interface ConstructorDeclarationNode extends DeclarationNode {
@@ -177,7 +180,7 @@ export interface ExportDeclarationNode extends DeclarationNode {
 
 export declare namespace ExecutionRule {
   export interface InsertCode {
-    code: vscode.SnippetString;
+    text: string;
     line: number;
     character: number;
   }

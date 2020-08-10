@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 
 import { APIGroup } from './types';
 import * as strings from './utils/strings';
-import { createInsertMethodRule } from './insert-method';
+import { createInsertMethodRule, insertMethodIntoRepository } from './insert-method';
 import { createInsertTypesRule, insertTypesIntoModel } from './insert-types';
 import {
   DEFAULT_RES_BODY_TYPE_NAME,
@@ -78,12 +78,13 @@ export function activate(context: vscode.ExtensionContext) {
     'vscode-api-viewer.insertTypeCode',
     async (node) => {
       const supportDomain = getConfiguration('api-viewer', 'supportDomain');
+      const activeTextEditor = vscode.window.activeTextEditor;
+      const cursorPosition = activeTextEditor?.selection.active;
       let insertIntoDomain = false;
       let insertReqCodePosition;
       let resTypeName: string | undefined = '';
       let requestMethodName: string | undefined = '';
       let domainName: string | undefined;
-
       if (supportDomain) {
         const insertMode = await vscode.window.showQuickPick(
           DOMAIN_INSERT_POSITION,
@@ -138,7 +139,8 @@ export function activate(context: vscode.ExtensionContext) {
           ignoreFocusOut: true,
         },
       );
-
+      
+      // paramsStructureTypePick 有默认值
       const paramsStructureType = paramsStructureTypePick!
         .label as ParamsStructureType;
 
@@ -146,11 +148,11 @@ export function activate(context: vscode.ExtensionContext) {
         const props = node.props as APINode['props'];
         resTypeName = strings.classify(<string>resTypeName);
         requestMethodName = strings.camelize(<string>requestMethodName);
-        const activeTextEditor = vscode.window.activeTextEditor;
         // 在 domain 中插入
         if (insertIntoDomain) {
           if (domainName) {
             insertTypesIntoModel(domainName, props, resTypeName);
+            insertMethodIntoRepository(domainName, props, resTypeName, requestMethodName, paramsStructureType);
           }
         } else {
           if (activeTextEditor) {
@@ -163,13 +165,19 @@ export function activate(context: vscode.ExtensionContext) {
                 props,
                 resTypeName,
               );
+              const typesSnippet = new vscode.SnippetString();
+              typesSnippet.appendText(insertTypesRule.text);
               await activeTextEditor.insertSnippet(
-                insertTypesRule.code,
+                typesSnippet,
                 new vscode.Position(
                   insertTypesRule.line,
                   insertTypesRule.character,
                 ),
               );
+
+              // 计算插入类型后，光标的偏移行数，再插入method
+              let lineOffset = typesSnippet.value.split('\n').length - 1;
+
               const insertMethodRule = await createInsertMethodRule(
                 activeTextEditor,
                 props,
@@ -178,23 +186,37 @@ export function activate(context: vscode.ExtensionContext) {
                 insertReqCodePosition,
                 paramsStructureType,
               );
-              const isInsertInAngularServiceClass =
-                insertReqCodePosition?.label ===
-                InsertReqCodePosition.AngularServiceClass;
-              const isInsertInCursorPlace =
-                insertReqCodePosition?.label ===
-                InsertReqCodePosition.CursorPosition;
-              if (isInsertInAngularServiceClass) {
-                await activeTextEditor.insertSnippet(
-                  insertMethodRule.code,
-                  new vscode.Position(
-                    insertMethodRule.line,
-                    insertMethodRule.character,
-                  ),
-                );
-              }
-              if (isInsertInCursorPlace) {
-                await activeTextEditor.insertSnippet(insertMethodRule.code);
+
+              if (insertMethodRule) {
+                const methodSnippet = new vscode.SnippetString();
+                methodSnippet.appendText(insertMethodRule.text);
+                const isInsertInAngularServiceClass =
+                  insertReqCodePosition?.label ===
+                  InsertReqCodePosition.AngularServiceClass;
+                const isInsertInCursorPlace =
+                  insertReqCodePosition?.label ===
+                  InsertReqCodePosition.CursorPosition;
+
+                // 插入到 Angular Service Class
+                if (isInsertInAngularServiceClass && insertMethodRule) {
+                  await activeTextEditor.insertSnippet(
+                    methodSnippet,
+                    new vscode.Position(
+                      insertMethodRule.line,
+                      insertMethodRule.character,
+                    ),
+                  );
+                }
+
+                // 在光标位置插入
+                if (isInsertInCursorPlace) {
+                  const line = cursorPosition ? cursorPosition.line + lineOffset : 0;
+                  const character = cursorPosition ? cursorPosition.character : 0;
+                  await activeTextEditor.insertSnippet(methodSnippet, new vscode.Position(
+                    line,
+                    character
+                  ));
+                }
               }
             }
           }

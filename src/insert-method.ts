@@ -6,7 +6,12 @@ import * as _path_ from 'path';
 import * as _ from 'lodash';
 import { SimpleAstParser } from './ast-parser';
 
-import { MethodDeclarationNode, ExecutionRule, Position } from './types';
+import {
+  MethodDeclarationNode,
+  ExecutionRule,
+  Position,
+  ClassDeclarationNode,
+} from './types';
 import { APINode } from './tree-view';
 import {
   DEFAULT_REQ_BODY_TYPE_NAME,
@@ -14,47 +19,60 @@ import {
   ParamsStructureType,
 } from './constants';
 import { getConfiguration } from './utils/vscode';
+import { getRepositoryFileFullPath } from './utils/domain';
+import { insertTextIntoFile } from './utils/file';
+import { DEFAULT_FUNCTION_TEMPLATE, DEFAULT_METHOD_TEMPLATE } from './template';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
-const DEFAULT_METHOD_TEMPLATE = `
-  <%= method_name %>(<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) {
-    return this.http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
-  }
-`;
 
-const DEFAULT_FUNCTION_TEMPLATE = `
-export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
-  return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
-}
-`;
 
 /**
  * 模板提供的 data 变量属性
  * @property {string} method_name 方法名
  * @property {string} http_method http 方法类型
  * @property {string} response_type response 数据类型名
- * @property {array} params - 入参列表
- * @property {boolean} need_request_body - 是否需要 request body
- * @property {string} req_body_type - request body 类型名
- * @property {string} res_type - response type
- * @property {string} path - 接口路径
+ * @property {array} params 入参列表
+ * @property {boolean} need_request_body 是否需要 request body
+ * @property {string} req_body_type request body 类型名
+ * @property {string} res_type response type
+ * @property {string} path 接口路径
  * @property {array} query_params - query 参数列表
- * @property {string} params_str - 已拼接的入参
- * @property {object} params_object_str - 对象类型的入参
- * @property {string} query_params_str - 已拼接的 query 参数
+ * @property {string} params_str 已拼接的入参
+ * @property {object} params_object_str 对象类型的入参
+ * @property {string} query_params_str 已拼接的 query 参数
+ */
+
+/**
+ *
+ * @param method
+ * @param path
+ * @param resTypeName
+ * @param methodName
+ * @param pathParams
+ * @param queryParams
+ * @param reqBodyTypeName
+ * @param templateStr
+ * @param paramsStructureType
  */
 
 function genRequestCode(
   method: string,
   path: string,
-  resTypeName = 'ResponseType',
+  resTypeName: string,
   methodName = 'requestSomething',
   pathParams: string[] = [],
   queryParams: string[] = [],
   reqBodyTypeName: string | null,
   templateStr: string,
   paramsStructureType: ParamsStructureType,
+  title: string,
 ) {
+  // 将 path 修改成模板字符串
+  if (pathParams.length) {
+    pathParams.forEach((param) => {
+      path = path.replace(new RegExp(`([^$]){${param}}`), `$1\${${param}}`);
+    });
+  }
   // 读取模板文件
   if (vscode.workspace.rootPath) {
     const configTemplateFilePath = _.trim(
@@ -111,7 +129,7 @@ function genRequestCode(
   }
   paramsStr = paramsStr.replace(/,\s$/, '');
   method = method.toLowerCase();
-  const str = ejs.render(templateStr, {
+  let str = ejs.render(templateStr, {
     method_name: methodName,
     params_str: paramsStr,
     req_body_type: reqBodyTypeName,
@@ -121,54 +139,42 @@ function genRequestCode(
     query_params_str: queryParamsStr,
     need_request_body: needReqBody && reqBodyTypeName,
   });
+  const comment = `/* ${title} */\n`;
+  str = '\n  ' + comment + '  ' + str + '\n';
   return str;
 }
 
-export function getLastMethodPositionInAngularService(
-  fullFilePath: string,
-  codeText: string,
+export function getLastPublicMethodPosition(
+  classNode: ClassDeclarationNode,
 ): Position {
-  let insertLine = -1;
-  const parser = new SimpleAstParser();
-  const classNodes = parser.parseClass(fullFilePath, codeText);
-  if (classNodes.length) {
-    let serviceClass;
-    for (let i = 0; i < classNodes.length; i++) {
-      const className = classNodes[i].declaration.name;
-      if (className?.text.match(/Service$/)) {
-        serviceClass = classNodes[i];
-        break;
-      }
+  let line = 0;
+  if (classNode) {
+    const methods = classNode.methods;
+    const constructorNode = classNode.constructor;
+    if (constructorNode) {
+      line = constructorNode.endPosition.line;
     }
-
-    if (serviceClass) {
-      const methods = serviceClass.methods;
-      const constructorNode = serviceClass.constructor;
-      if (constructorNode) {
-        insertLine = constructorNode.startPosition.line + 1;
-      }
-      if (methods.length) {
-        let lastPublicMethod: MethodDeclarationNode | null = null;
-        methods.forEach((m) => {
-          let isPrivateMethod = false;
-          ts.forEachChild(m.declaration, (node) => {
-            if (node.kind === ts.SyntaxKind.PrivateKeyword) {
-              isPrivateMethod = true;
-            }
-          });
-          if (!isPrivateMethod) {
-            lastPublicMethod = m;
+    if (methods.length) {
+      let lastPublicMethod: MethodDeclarationNode | null = null;
+      methods.forEach((m) => {
+        let isPrivateMethod = false;
+        ts.forEachChild(m.declaration, (node) => {
+          if (node.kind === ts.SyntaxKind.PrivateKeyword) {
+            isPrivateMethod = true;
           }
         });
-        if (lastPublicMethod) {
-          insertLine =
-            (<MethodDeclarationNode>lastPublicMethod).endPosition.line + 1;
+        if (!isPrivateMethod) {
+          lastPublicMethod = m;
         }
+      });
+      if (lastPublicMethod) {
+        line =
+          (<MethodDeclarationNode>lastPublicMethod).endPosition.line;
       }
     }
   }
   return {
-    line: insertLine,
+    line: line,
     character: 0,
   };
 }
@@ -192,36 +198,43 @@ export async function createInsertMethodRule(
   requestMethodName: string,
   insertPlace: vscode.QuickPickItem | undefined,
   paramsStructureType: ParamsStructureType,
-): Promise<ExecutionRule.InsertCode> {
+): Promise<ExecutionRule.InsertCode | undefined> {
   let line = 0;
-  const parser = new SimpleAstParser();
-  const snippetString = new vscode.SnippetString();
 
   const isInsertInAngularServiceClass =
     insertPlace?.label === InsertReqCodePosition.AngularServiceClass;
   const isInsertInCursorPlace =
     insertPlace?.label === InsertReqCodePosition.CursorPosition;
   const codeText = editor.document.getText();
-  const fullFilePath = editor.document.fileName;
+  const fileFullPath = editor.document.fileName;
+  const parser = new SimpleAstParser(fileFullPath, codeText);
+
+  if (isInsertInAngularServiceClass) {
+    let serviceClass = parser
+      .getClasses()
+      .find((i) => i.declaration.name?.text.match(/Service$/));
+    if (serviceClass) {
+      const position = getLastPublicMethodPosition(serviceClass);
+      line = position.line + 1;
+    } else {
+      console.error('没有找到 service class');
+      return undefined;
+    }
+  }
+
   // 插入请求方法
   const method = props.method;
   let path = props.path;
   const pathParams = props.pathParams;
   const queryParams = props.queryParams;
-  const needReqBody = props.reqBody;
-  
-  // 将 path 修改成模板字符串
-  if (pathParams.length) {
-    pathParams.forEach((param) => {
-      path = path.replace(new RegExp(`([^$]){${param}}`), `$1\${${param}}`);
-    });
-  }
-  const comment = `/* ${props.title} */\n`;
+  const needReqBody = !!props.reqBody;
+
   let templateStr = DEFAULT_FUNCTION_TEMPLATE;
   if (isInsertInAngularServiceClass) {
     templateStr = DEFAULT_METHOD_TEMPLATE;
   }
-  let _snippetString = genRequestCode(
+
+  let snippetString = genRequestCode(
     method,
     path,
     resTypeName,
@@ -231,18 +244,62 @@ export async function createInsertMethodRule(
     needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
     templateStr,
     paramsStructureType,
+    props.title,
   );
-  _snippetString = '\n  ' + comment + '  ' + _snippetString + '\n';
-  snippetString.appendText(_snippetString);
-
-  if (isInsertInAngularServiceClass) {
-    const position = getLastMethodPositionInAngularService(fullFilePath, codeText);
-    line = position.line;
-  }
 
   return {
-    code: snippetString,
+    text: snippetString,
     line,
     character: 0,
   };
+}
+
+export function insertMethodIntoRepository(
+  domainName: string,
+  props: APINode['props'],
+  resTypeName: string,
+  requestMethodName: string,
+  paramsStructureType: ParamsStructureType,
+) {
+  let line = 0;
+  const repositoryFileFullPath = getRepositoryFileFullPath(domainName);
+  if (!repositoryFileFullPath) {
+    return;
+  }
+  const sourceText = fs.readFileSync(repositoryFileFullPath).toString();
+  const parser = new SimpleAstParser(repositoryFileFullPath, sourceText);
+  // 插入请求方法
+  const method = props.method;
+  let path = props.path;
+  const pathParams = props.pathParams;
+  const queryParams = props.queryParams;
+  const needReqBody = !!props.reqBody;
+  resTypeName += 'Entity';
+
+  let templateStr = DEFAULT_METHOD_TEMPLATE;
+
+  let snippetString = genRequestCode(
+    method,
+    path,
+    resTypeName,
+    requestMethodName,
+    pathParams,
+    queryParams,
+    needReqBody ? DEFAULT_REQ_BODY_TYPE_NAME : null,
+    templateStr,
+    paramsStructureType,
+    props.title,
+  );
+
+  let _class = parser
+    .getClasses()
+    .find((i) => i.declaration.name?.text.match(/Repository$/));
+  if (_class) {
+    const position = getLastPublicMethodPosition(_class);
+    line = position.line;
+    insertTextIntoFile(repositoryFileFullPath, line + 1, 0, snippetString);
+  } else {
+    console.error('没有找到 class');
+    return undefined;
+  }
 }

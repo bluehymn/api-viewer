@@ -7,22 +7,19 @@ import * as path from 'path';
 import { APINode } from './tree-view';
 import { DEFAULT_REQ_BODY_TYPE_NAME } from './constants';
 import { ExecutionRule, Position, API, ImportDeclarationNode } from './types';
-import { getDomainFullPath } from './utils/domain';
+import { getDomainFullPath, getRepositoryFileFullPath } from './utils/domain';
 import { insertTextIntoFile } from './utils/file';
 import * as ts from 'typescript';
 
 // 查找最后一个interface的位置, 没有则返回最后一个import的位置，默认返回第一行
 export function getLastInterfacePosition(
-  fullFilePath: string,
+  fileFullPath: string,
   codeText: string,
 ): Position {
-  const parser = new SimpleAstParser();
+  const parser = new SimpleAstParser(fileFullPath, codeText);
   let line = -1;
-  const { importNodes, interfaceNodes } = parser.parseImportsAndTypes(
-    fullFilePath,
-    codeText,
-  );
-
+  const importNodes = parser.getImports();
+  const interfaceNodes = parser.getInterfaces();
   if (importNodes.length) {
     const lastImportNode = importNodes[importNodes.length - 1];
     line = lastImportNode.endPosition.line;
@@ -38,17 +35,15 @@ export function getLastInterfacePosition(
 }
 
 export function getImportDeclarationNodeByModule(
-  fullFilePath: string,
+  fileFullPath: string,
   sourceText: string,
   module: string,
 ): {
   target: ImportDeclarationNode | undefined;
   importNodes: ImportDeclarationNode[];
 } {
-  const parser = new SimpleAstParser();
-  let insertLine = 0;
-  const { importNodes } = parser.parseImportsAndTypes(fullFilePath, sourceText);
-  const sourceFile = SimpleAstParser.createSourceFile(fullFilePath, sourceText);
+  const parser = new SimpleAstParser(fileFullPath, sourceText);
+  const importNodes = parser.getImports();
   const result: ReturnType<typeof getImportDeclarationNodeByModule> = {
     target: undefined,
     importNodes,
@@ -116,19 +111,17 @@ export async function createInsertTypesRule(
   resTypeName: string,
 ): Promise<ExecutionRule.InsertCode> {
   const codeText = editor.document.getText();
-  const fullFilePath = editor.document.fileName;
-  const snippetString = new vscode.SnippetString();
+  const fileFullPath = editor.document.fileName;
   const rule: ExecutionRule.InsertCode = {
-    code: snippetString,
+    text: '',
     line: 0,
     character: 0,
   };
   try {
     const responseTypeStr = await genResponseTypes(props.resBody, resTypeName);
     const reqBodyTypeStr = await genRequestTypes(props.reqBody);
-    // TODO：'\n' +
-    snippetString.appendText(responseTypeStr + reqBodyTypeStr);
-    const position = getLastInterfacePosition(fullFilePath, codeText);
+    rule.text = '\n' + responseTypeStr + reqBodyTypeStr;
+    const position = getLastInterfacePosition(fileFullPath, codeText);
     rule.line = position.line + 1;
   } catch (e) {
     console.error(e);
@@ -152,8 +145,7 @@ export async function insertTypesIntoModel(
   const entityName = resTypeName + 'Entity';
   const modelName = resTypeName + 'Model';
   const paramsName = DEFAULT_REQ_BODY_TYPE_NAME;
-  const entityModule =
-    '../model/' + strings.dasherize(domainName) + '.entity';
+  const entityModule = '../model/' + strings.dasherize(domainName) + '.entity';
   const modelModule = '../model/' + strings.dasherize(domainName) + '.model';
   const interfacesModule = '../model/interfaces';
 
@@ -162,17 +154,13 @@ export async function insertTypesIntoModel(
   }
 
   domainModelDirFullPath = domainFullPath + 'model';
-  entityFileFullPath = path.join(
+  entityFileFullPath = path.join(domainFullPath, 'model', entityModule + '.ts');
+  modelFileFullPath = path.join(domainFullPath, 'model', modelModule + '.ts');
+  interfacesFileFullPath = path.join(
     domainFullPath,
     'model',
-    entityModule + '.ts',
+    interfacesModule + '.ts',
   );
-  modelFileFullPath = path.join(
-    domainFullPath,
-    'model',
-    modelModule + '.ts',
-  );
-  interfacesFileFullPath = path.join(domainFullPath, 'model', interfacesModule + '.ts');
 
   entityFileText = fs.readFileSync(entityFileFullPath).toString();
   modelFileText = fs.readFileSync(modelFileFullPath).toString();
@@ -237,17 +225,13 @@ export function importTypeIntoRepository(
   typeName: string,
   module: string,
 ) {
-  const domainFullPath = getDomainFullPath(domainName);
-  const repositoryFileFullPath = path.join(
-    domainFullPath!,
-    'repository',
-    strings.dasherize(domainName) + '.repository.ts',
-  );
+  const repositoryFileFullPath = getRepositoryFileFullPath(domainName);
+  if (!repositoryFileFullPath) {
+    return;
+  }
   const sourceText = fs.readFileSync(repositoryFileFullPath, 'utf8').toString();
-  const sourceFile = SimpleAstParser.createSourceFile(
-    repositoryFileFullPath,
-    sourceText,
-  );
+  const parser = new SimpleAstParser(repositoryFileFullPath, sourceText);
+
   const entityImportNode = getImportDeclarationNodeByModule(
     repositoryFileFullPath,
     sourceText,
@@ -258,10 +242,10 @@ export function importTypeIntoRepository(
     // 找到 import 的 NameImports 插入到最后一个后面
     const importClause = entityImportNode.target.declaration.importClause;
     if (importClause) {
-      const children = importClause.getChildren(sourceFile);
+      const children = importClause.getChildren(parser.getSourceFile());
       for (let i = 0; i < children.length; i++) {
         if (children[i].kind === ts.SyntaxKind.NamedImports) {
-          const nameImports = children[i].getChildren(sourceFile);
+          const nameImports = children[i].getChildren(parser.getSourceFile());
           if (nameImports.length) {
             /**
              * nameImports 的结构
@@ -271,7 +255,9 @@ export function importTypeIntoRepository(
              *
              * 2: } - CloseBraceToken = 19,
              */
-            const syntaxNodeList = nameImports[1].getChildren(sourceFile);
+            const syntaxNodeList = nameImports[1].getChildren(
+              parser.getSourceFile(),
+            );
             let lastNode: ts.Node | undefined;
             if (syntaxNodeList.length) {
               lastNode = syntaxNodeList[syntaxNodeList.length - 1];
@@ -282,9 +268,9 @@ export function importTypeIntoRepository(
               typeName = ' ' + typeName;
             }
             if (lastNode) {
-              const {
-                endLineAndCharacter,
-              } = SimpleAstParser.getCodeLineNumbers(lastNode, sourceFile);
+              const { endLineAndCharacter } = parser.getCodeLineNumbers(
+                lastNode,
+              );
 
               insertTextIntoFile(
                 repositoryFileFullPath,
@@ -300,7 +286,7 @@ export function importTypeIntoRepository(
     }
   } else {
     // prettier-ignore
-    const importDeclarationStr = `import { ${typeName} } from '${module}'`;
+    const importDeclarationStr = `import { ${typeName} } from '${module}' \n`;
     let lineNum = 0;
     const length = entityImportNode.importNodes.length;
     if (length > 0) {
