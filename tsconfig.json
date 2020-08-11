@@ -17,6 +17,6 @@
 	"exclude": [
 		"node_modules",
 		".vscode-test",
-		"src/test/test-files"
+		"src/test/test-project"
 	]
 }

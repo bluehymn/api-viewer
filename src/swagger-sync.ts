@@ -7,7 +7,7 @@ export function syncFromSwagger(url: string) {
   return new Promise<APIGroup[]>((resolve, reject) => {
     SwaggerParser.validate(url, (err, data) => {
       if (err) {
-        reject(new Error('APIViewer: Import failed'));
+        reject(null);
       } else {
         groups = adapter(data, 'swagger');
         resolve(groups);

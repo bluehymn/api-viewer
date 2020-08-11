@@ -82,8 +82,8 @@ export function activate(context: vscode.ExtensionContext) {
       const cursorPosition = activeTextEditor?.selection.active;
       let insertIntoDomain = false;
       let insertReqCodePosition;
-      let resTypeName: string | undefined = '';
-      let requestMethodName: string | undefined = '';
+      let resTypeName: string | undefined;
+      let requestMethodName: string | undefined;
       let domainName: string | undefined;
       if (supportDomain) {
         const insertMode = await vscode.window.showQuickPick(

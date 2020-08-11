@@ -6,20 +6,30 @@ import { adapter } from './adapter';
 import { getConfiguration } from './utils/vscode';
 
 export async function syncFromYapi() {
-  let groups: APIGroup[] = [];
   // 读取配置文件
-  const email = getConfiguration('api-viewer.yapi', 'email');
-  const password = getConfiguration('api-viewer.yapi', 'password');
-  let url = _.trim(getConfiguration('api-viewer.yapi', 'url') as string);
+  const email = getConfiguration<string>('api-viewer.yapi', 'email');
+  const password = getConfiguration<string>('api-viewer.yapi', 'password');
+  let url = _.trim(getConfiguration<string>('api-viewer.yapi', 'url'));
   url = url.match(/\/$/) ? url : url + '/';
-  const pid = _.trim(getConfiguration('api-viewer.yapi', 'pid') as string);
+  const pid = _.trim(getConfiguration<string>('api-viewer.yapi', 'pid'));
 
   if (!(email && password && url && pid)) {
-    return new Error('APIViewer: Missing some configurations!');
+    console.error('APIViewer: Missing some configurations!');
+    return [];
   }
 
   vscode.window.showInformationMessage('APIViewer: Syncing data from Yapi');
 
+  return await getYapiData(url, email, password, pid);
+}
+
+export async function getYapiData(
+  url: string,
+  email: string,
+  password: string,
+  pid: string,
+) {
+  let groups: APIGroup[] = [];
   // 登录获取cookie
   const response = await got(`${url}api/user/login`, {
     method: 'POST',
@@ -28,7 +38,8 @@ export async function syncFromYapi() {
 
   const responseJson = JSON.parse(response.body);
   if (responseJson.errcode === 405) {
-    return new Error('APIViewer: Incorrect account or password');
+    console.error('APIViewer: Incorrect account or password');
+    return [];
   }
 
   const cookies = response.headers['set-cookie']?.map((cookie) => {
@@ -48,7 +59,8 @@ export async function syncFromYapi() {
     const data = JSON.parse(apiResponse.body);
     groups = adapter(data, 'yapi');
   } catch (e) {
-    return new Error('APIViewer: Invalid data format');
+    console.error('APIViewer: Invalid data format');
+    return [];
   }
 
   return groups;
