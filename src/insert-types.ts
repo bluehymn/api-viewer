@@ -69,6 +69,7 @@ export async function genResponseTypes(
   if (resBody) {
     let resBodyJson;
     resBodyJson = resBody;
+    delete resBodyJson.title;
     responseTypeStr = await schemaToTypescript(resBody, resTypeName, {
       bannerComment: `/* ${strings.classify(resTypeName)} */`,
     });

@@ -103,7 +103,7 @@ function genRequestCode(
   }
   if (queryParams.length) {
     paramsObjectTypeStr =
-      '{' + queryParams.map((i) => i + ': string;').join('') + '}';
+      '{' + queryParams.map((i) => i + ': string;').join(' ') + '}';
     if (paramsStructureType === 'Normal') {
       paramsStr += queryParams.map((i) => i + ': string, ').join('');
     } else {
