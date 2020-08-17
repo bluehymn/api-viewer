@@ -122,6 +122,9 @@ Example:
 
 ## Change Log
 
+### v0.1.8
+1、修复 bugs
+
 ### v0.1.7
 1、修复 bugs
 
