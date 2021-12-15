@@ -11,7 +11,7 @@
   ],
   "publisher": "bluehymn",
   "repository": "https://github.com/bluehymn/api-viewer",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "engines": {
     "vscode": "^1.45.0"
   },
@@ -36,7 +36,7 @@
     "views": {
       "api-viewer-explorer": [
         {
-          "id": "api-viewer-list",
+          "id": "apiViewerList",
           "name": ""
         }
       ]
@@ -51,7 +51,7 @@
       "view/title": [
         {
           "command": "vscode-api-viewer.sync",
-          "when": "view =~ /api-viewer/",
+          "when": "view =~ /apiViewerList/",
           "group": "navigation@1"
         }
       ],

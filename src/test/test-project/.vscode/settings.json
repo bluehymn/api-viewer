@@ -3,5 +3,4 @@
   "api-viewer.yapi.password": "123456",
   "api-viewer.yapi.pid": "11",
   "api-viewer.yapi.url": "http://127.0.0.1:3000/",
-  "api-viewer.supportDomain": true,
 }

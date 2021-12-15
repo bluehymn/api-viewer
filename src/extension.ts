@@ -20,7 +20,7 @@ import { syncFromYapi } from './yapi-sync';
 import { getConfiguration } from './utils/vscode';
 
 export let apiGroups: APIGroup[] = [];
-let apiViewListTree: vscode.TreeView<TreeNode>;
+let apiViewListTree: vscode.Disposable;
 let provider: vscode.TreeDataProvider<TreeNode>;
 
 const INSERT_POSITION: vscode.QuickPickItem[] = [
@@ -259,11 +259,8 @@ export function deactivate() {}
 
 async function sync() {
   let from = '';
-  if (apiViewListTree) {
-    apiViewListTree.message = '';
-  }
   apiGroups = [];
-
+ 
   const swaggerJsonUrl = getConfiguration(
     'api-viewer.swagger',
     'url',
@@ -284,15 +281,11 @@ async function sync() {
     }
   }
 
-  // 销毁已创建的TreeView
-  if (apiViewListTree) {
-    apiViewListTree.dispose();
-  }
-
   provider = new TreeNodeProvider(apiGroups);
-  apiViewListTree = vscode.window.createTreeView('api-viewer-list', {
-    treeDataProvider: provider,
-  });
+  apiViewListTree = vscode.window.registerTreeDataProvider(
+    'apiViewerList',
+    provider,
+  );
 
   vscode.window.showInformationMessage(
     `APIViewer: Sync from ${from} successful`,

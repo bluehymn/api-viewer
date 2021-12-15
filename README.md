@@ -68,6 +68,21 @@ swagger json 的地址，填写了 swagger 地址后，插件将使用默认导�
   }
 ```
 
+### 模板例子
+```
+
+---FunctionTemplate
+export const <%= method_name %> = (<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) => {
+    return http.<%= http_method %><<%= response_type %>>(\`<%= path %><%- query_params_str %>\`<% if (need_request_body) { %>, reqBody <% } %>);
+  }
+---
+
+```
+顶部的`---FunctionTemplate` 和 底部的`---` 必须包含
+
+
+
+
 ### 输出代码例子
 ```js
   export class request {
@@ -121,6 +136,9 @@ Example:
 ```
 
 ## Change Log
+
+### v0.1.9
+1、修复模板 bug
 
 ### v0.1.8
 1、修复 bugs

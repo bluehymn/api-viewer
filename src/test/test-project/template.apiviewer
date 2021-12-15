@@ -1,0 +1,13 @@
+---FunctionTemplate
+
+export async function <%= method_name %>(<%= params_str %><% if (need_request_body) { %><% if (params_str) { %>, <% } %>reqBody: <%= req_body_type %><% } %>) {
+  console.log(11111);
+  return request<<%= response_type %>>(`<%= path %><%- query_params_str %>`, {
+    method: '<%= http_method %>',<% if (need_request_body) { %> 
+    data: {
+      ...reqBody,
+    },<% } %>
+  });
+}
+
+---

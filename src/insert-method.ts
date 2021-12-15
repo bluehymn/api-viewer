@@ -24,8 +24,6 @@ import { insertTextIntoFile } from './utils/file';
 import { DEFAULT_FUNCTION_TEMPLATE, DEFAULT_METHOD_TEMPLATE } from './template';
 const DEFAULT_TEMPLATE_FILE_PATH = 'template.apiviewer';
 
-
-
 /**
  * 模板提供的 data 变量属性
  * @property {string} method_name 方法名
@@ -76,19 +74,26 @@ function genRequestCode(
   // 读取模板文件
   if (vscode.workspace.rootPath) {
     const configTemplateFilePath = _.trim(
-      getConfiguration('api-viewer', 'templateFilePath') as string,
+      (getConfiguration('api-viewer', 'templateFilePath') as string) ||
+        DEFAULT_TEMPLATE_FILE_PATH,
     );
     if (configTemplateFilePath) {
       const fileFullPath = _path_.join(
         vscode.workspace.rootPath || '',
-        configTemplateFilePath || DEFAULT_TEMPLATE_FILE_PATH,
+        configTemplateFilePath,
       );
-      const fileBuffer = fs.readFileSync(fileFullPath);
-      const fileStr = fileBuffer.toString();
-      let templateMatches = fileStr.match(/```method((.|[\r\n\s])+)```/m);
-      if (templateMatches) {
-        const tmpStr = templateMatches[1];
-        templateStr = tmpStr;
+      try {
+        const fileBuffer = fs.readFileSync(fileFullPath);
+        const fileStr = fileBuffer.toString();
+        let templateMatches = fileStr.match(
+          /---FunctionTemplate((.|[\r\n\s])+)---/m,
+        );
+        if (templateMatches) {
+          const tmpStr = templateMatches[1];
+          templateStr = tmpStr;
+        }
+      } catch (error) {
+        console.error(error);
       }
     }
   }
@@ -168,8 +173,7 @@ export function getLastPublicMethodPosition(
         }
       });
       if (lastPublicMethod) {
-        line =
-          (<MethodDeclarationNode>lastPublicMethod).endPosition.line;
+        line = (<MethodDeclarationNode>lastPublicMethod).endPosition.line;
       }
     }
   }

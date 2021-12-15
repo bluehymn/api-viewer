@@ -96,14 +96,8 @@ export abstract class TreeNode extends vscode.TreeItem {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
     super(label, collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
+    this.tooltip = label;
+    this.description = desc;
   }
 }
 
@@ -120,14 +114,6 @@ export class GroupNode extends TreeNode {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
     super(label, desc, 'group', collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
   }
 }
 
@@ -146,14 +132,7 @@ export class APINode extends TreeNode {
     super(label, desc, 'api', collapsibleState);
     this.label = `${props.method} ${props.path}`;
     this.contextValue = 'APINode';
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.props.title;
+    this.description = this.props.title;
   }
 }
 
@@ -164,13 +143,5 @@ export class ApiPropsNode extends TreeNode {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
     super(label, desc, 'apiProps', collapsibleState);
-  }
-
-  get tooltip() {
-    return `${this.label}`;
-  }
-
-  get description(): string {
-    return this.desc;
   }
 }
